@@ -1,6 +1,6 @@
-rm -Rf ../../Code/NoFlowSolverAllExternalsBuild
-mkdir -p ../../Code/NoFlowSolverAllExternalsBuild
-pushd ../../Code/NoFlowSolverAllExternalsBuild
+rm -Rf ../../Code/SeparateSandBoxBuild
+mkdir -p ../../Code/SeparateSandBoxBuild
+pushd ../../Code/SeparateSandBoxBuild
 
 #compilers
 export CC="clang"
@@ -14,7 +14,7 @@ export REPLACEME_SV_MAKE_CMD="make -j8"
 export REPLACEME_SV_TOP_SRC_DIR_SV="../"
 
 #externals
-export REPLACEME_SV_EXTERNALS_TOPLEVEL_DIR="/Users/adamupdegrove/Documents/Software/SimVascular/MyMaster/Code/MasterBuild/Externals"
+export REPLACEME_SV_EXTERNALS_TOPLEVEL_DIR="/usr/local/sv/ext"
 
 "$REPLACEME_SV_CMAKE_CMD" \
 \
@@ -33,13 +33,11 @@ export REPLACEME_SV_EXTERNALS_TOPLEVEL_DIR="/Users/adamupdegrove/Documents/Softw
    -DSV_USE_ITK=ON \
    -DSV_USE_MPICH2=OFF \
    -DSV_USE_OpenCASCADE=ON \
-   -DSV_USE_PYTHON=ON \
    -DSV_USE_MMG=ON \
 \
    -DSV_USE_SYSTEM_FREETYPE=ON \
    -DSV_USE_SYSTEM_GDCM=ON \
    -DSV_USE_SYSTEM_ITK=ON \
-   -DSV_USE_SYSTEM_PYTHON=ON \
    -DSV_USE_SYSTEM_OpenCASCADE=ON \
    -DSV_USE_SYSTEM_TCL=ON \
    -DSV_USE_SYSTEM_VTK=ON \

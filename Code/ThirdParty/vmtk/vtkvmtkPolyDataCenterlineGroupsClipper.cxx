@@ -21,6 +21,7 @@ Version:   $Revision: 1.9 $
 
 #include "vtkvmtkPolyDataCenterlineGroupsClipper.h"
 #include "vtkExecutive.h"
+#include "vtkExtractGeometry.h"
 #include "vtkPointData.h"
 #include "vtkCellData.h"
 #include "vtkIntArray.h"
@@ -302,14 +303,6 @@ int vtkvmtkPolyDataCenterlineGroupsClipper::RequestData(
       tubeDifferenceValue = nonGroupTubeValue - groupTubeValue;
       clippingArray->SetValue(k,tubeDifferenceValue);
       }
-   // std::stringstream out;
-   // out << i;
-   // std::string filestring = "/Users/adamupdegrove/Desktop/ClipInput"+out.str()+".vtp";
-   // vtkXMLPolyDataWriter *mywriter = vtkXMLPolyDataWriter::New();
-   // mywriter->SetInputData(clippingInput);
-   // mywriter->SetFileName(filestring.c_str());
-   // mywriter->Write();
-   // mywriter->Delete();
 
     vtkClipPolyData* clipper = vtkClipPolyData::New();
 #if (VTK_MAJOR_VERSION <= 5)

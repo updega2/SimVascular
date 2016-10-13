@@ -4315,6 +4315,8 @@ int sys_geom_cap( cvPolyData *polydata,cvPolyData **cappedpolydata,int *numcente
   vtkSmartPointer<vtkIdList> capCenterIds = vtkSmartPointer<vtkIdList>::New();
   vtkSmartPointer<vtkTriangleFilter> triangulate =
 	  vtkSmartPointer<vtkTriangleFilter>::New();
+  vtkSmartPointer<vtkCleanPolyData> cleaner =
+	  vtkSmartPointer<vtkCleanPolyData>::New();
   int numids;
   int *allids;
   int i;
@@ -4329,6 +4331,8 @@ int sys_geom_cap( cvPolyData *polydata,cvPolyData **cappedpolydata,int *numcente
       capper->SetCellEntityIdOffset(1);
       capper->Update();
       triangulate->SetInputData(capper->GetOutput());
+      triangulate->PassLinesOff();
+      triangulate->PassVertsOff();
       triangulate->Update();
 
       result = new cvPolyData( triangulate->GetOutput() );
@@ -4337,16 +4341,20 @@ int sys_geom_cap( cvPolyData *polydata,cvPolyData **cappedpolydata,int *numcente
     }
     else if (type == 1)
     {
+      cleaner->SetInputData(geom);
+      cleaner->Update();
+      triangulate->SetInputData(cleaner->GetOutput());
+      triangulate->PassLinesOff();
+      triangulate->PassVertsOff();
+      triangulate->Update();
       vtkSmartPointer<vtkvmtkCapPolyData> capper =
 	      vtkSmartPointer<vtkvmtkCapPolyData>::New();
-      capper->SetInputData(geom);
+      capper->SetInputData(triangulate->GetOutput());
       capper->SetDisplacement(0);
       capper->SetInPlaneDisplacement(0);
       capper->Update();
-      triangulate->SetInputData(capper->GetOutput());
-      triangulate->Update();
 
-      result = new cvPolyData( triangulate->GetOutput() );
+      result = new cvPolyData( capper->GetOutput() );
       *cappedpolydata = result;
       capCenterIds->DeepCopy(capper->GetCapCenterIds());
 

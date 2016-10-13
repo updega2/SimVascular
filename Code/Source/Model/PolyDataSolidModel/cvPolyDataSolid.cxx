@@ -206,13 +206,13 @@ int cvPolyDataSolid::ReadNative( char *filename )
     return CV_ERROR;
   }
 
-  vtkSmartPointer<vtkCleanPolyData> cleaner =
-    vtkSmartPointer<vtkCleanPolyData>::New();
+  //vtkSmartPointer<vtkCleanPolyData> cleaner =
+  //  vtkSmartPointer<vtkCleanPolyData>::New();
 
-  cleaner->SetInputData(geom_);
-  cleaner->Update();
+  //cleaner->SetInputData(geom_);
+  //cleaner->Update();
 
-  geom_->DeepCopy(cleaner->GetOutput());
+  //geom_->DeepCopy(cleaner->GetOutput());
   geom_->BuildLinks();
 
   return CV_OK;
