@@ -47,6 +47,8 @@ svSegSelectionWidget::svSegSelectionWidget(QWidget *parent)
     connect(m_LoftWidget->ui->btnClose, SIGNAL(clicked()), this, SLOT(HideLoftWidget()) );
 
     connect(ui->btnUniformParameters, SIGNAL(clicked()), this, SLOT(ShowLoftWidget()) );
+    connect(ui->btnSelectAllSegs, SIGNAL(clicked()), this, SLOT( UseAll() ));
+    connect(ui->btnDeselectAllSegs, SIGNAL(clicked()), this, SLOT( UseNone() ));
 
 }
 

@@ -23,7 +23,7 @@
 
 #include "vtkXMLPolyDataWriter.h"
 
-vtkPolyData* svModelUtils::CreatePolyData(std::vector<svContourGroup*> groups, std::vector<vtkPolyData*> vtps, int numSamplingPts, svLoftingParam *param, unsigned int t, int noInterOut, double tol)
+vtkPolyData* svModelUtils::CreatePolyData(std::vector<svContourGroup*> groups, std::vector<vtkPolyData*> vtps, int numSamplingPts, svLoftingParam *param, int &errorSurfNum, unsigned int t, int noInterOut, double tol)
 {
     int groupNumber=groups.size();
     int vtpNumber=vtps.size();
@@ -37,6 +37,7 @@ vtkPolyData* svModelUtils::CreatePolyData(std::vector<svContourGroup*> groups, s
         for (int j=0; j< i-1; j++)
           delete srcs[j];
         delete [] srcs;
+        errorSurfNum = i;
         return NULL;
       }
       srcs[i]=new cvPolyData(vtkpd);
@@ -50,6 +51,7 @@ vtkPolyData* svModelUtils::CreatePolyData(std::vector<svContourGroup*> groups, s
             for(int j=0;j<i+groupNumber-1;j++)
                 delete srcs[j];
             delete [] srcs;
+            errorSurfNum = groupNumber+i;
             return NULL;
         }
         vtkPolyData* newvtp=vtkPolyData::New();
@@ -72,6 +74,7 @@ vtkPolyData* svModelUtils::CreatePolyData(std::vector<svContourGroup*> groups, s
 
     cvPolyData *dst=NULL;
 
+    errorSurfNum = -1;
     int status=sys_geom_all_union(srcs, groupNumber+vtpNumber, noInterOut, tol, &dst);
 
     for(int i=0;i<groupNumber+vtpNumber;i++)
@@ -81,9 +84,13 @@ vtkPolyData* svModelUtils::CreatePolyData(std::vector<svContourGroup*> groups, s
     delete [] srcs;
 
     if(status!=SV_OK)
-        return NULL;
+    {
+      return NULL;
+    }
     else
-        return dst->GetVtkPolyData();
+    {
+      return dst->GetVtkPolyData();
+    }
 }
 
 svModelElementPolyData* svModelUtils::CreateModelElementPolyData(std::vector<mitk::DataNode::Pointer> segNodes, int numSamplingPts, int stats[], svLoftingParam *param, unsigned int t, int noInterOut, double tol)
@@ -114,8 +121,23 @@ svModelElementPolyData* svModelUtils::CreateModelElementPolyData(std::vector<mit
         }
     }
 
-    vtkPolyData* solidvpd=CreatePolyData(groups,vtps,numSamplingPts,param,t,noInterOut,tol);
-    if(solidvpd==NULL) return NULL;
+    int errorSurfNum = -1;
+    vtkPolyData* solidvpd=CreatePolyData(groups,vtps,numSamplingPts,param,errorSurfNum,t,noInterOut,tol);
+    if(solidvpd==NULL)
+    {
+      if (errorSurfNum == -1)
+      {
+        fprintf(stderr,"Error unioning solid\n");
+        stats[0] = -1;
+      }
+      else
+      {
+        fprintf(stderr,"Error on surface number: %d\n", errorSurfNum);
+        fprintf(stderr,"Error on surface with name: %s\n", segNames[errorSurfNum].c_str());
+        stats[0] = errorSurfNum;
+      }
+      return NULL;
+    }
 
     cvPolyData *src=new cvPolyData(solidvpd);
     cvPolyData *dst = NULL;
@@ -123,6 +145,7 @@ svModelElementPolyData* svModelUtils::CreateModelElementPolyData(std::vector<mit
     if(stats&&sys_geom_checksurface(src,stats,tol)!=SV_OK)
     {
       solidvpd->Delete();
+      stats[0] = -1;
       return NULL;
     }
 
@@ -132,6 +155,7 @@ svModelElementPolyData* svModelUtils::CreateModelElementPolyData(std::vector<mit
     if (sys_geom_set_ids_for_caps(src, &dst,  &doublecaps,&numfaces) != SV_OK)
     {
       solidvpd->Delete();
+      stats[0] = -1;
       return NULL;
     }
 
@@ -207,6 +231,7 @@ svModelElementPolyData* svModelUtils::CreateModelElementPolyData(std::vector<mit
     if(!ok)
     {
       MITK_ERROR << "Failed to subdivide caps of created PolyData";
+      stats[0] = -1;
       return NULL;
     }
 

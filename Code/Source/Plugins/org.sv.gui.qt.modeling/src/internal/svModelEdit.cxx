@@ -1592,8 +1592,22 @@ void svModelEdit::CreateModel()
 
         if(newModelElement==NULL)
         {
+          if (m_ModelType=="PolyData")
+          {
+            if (stats[0] == -1)
+            {
+              statusText="Failed in unioning surfaces. Modify longitudinal and/or circumferential sampling.";
+            }
+            else
+            {
+              statusText="Failed in lofting surface " + QString::fromStdString(segNodes[stats[0]]->GetName()) + ". Check segmentation quality and order.";
+            }
+          }
+          else
+          {
             statusText="Failed to create model.";
-            created = 0;
+          }
+          created = 0;
         }
         else if(m_ModelType=="PolyData")
         {
@@ -1618,7 +1632,7 @@ void svModelEdit::CreateModel()
     mitk::StatusBar::GetInstance()->DisplayText(statusText.toStdString().c_str());
     if (!created)
     {
-      QMessageBox::warning(m_Parent,"Warning","Error creating model.");
+      QMessageBox::warning(m_Parent,"Warning", statusText);
       return;
     }
 
