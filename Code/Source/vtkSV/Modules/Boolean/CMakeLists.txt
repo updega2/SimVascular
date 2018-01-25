@@ -60,12 +60,39 @@ if("${VTKSV_DELAUNAY_TYPE}" STREQUAL "TRIANGLE")
   add_definitions(-DTRILIBRARY)
   set(SRCS ${SRCS}
     vtkTriangleDelaunay2D.cxx
+    vtkDelaunay2D_60.cxx
+    vtkPolygon_81.cxx
     predicates.c
-    triangle.c)
+    triangle.c
+    graphEmbed.c
+    graphIO.c
+    graphIsolator.c
+    graphNonplanar.c
+    graphPreprocess.c
+    graphStructure.c
+    graphTests.c
+    listcoll.c
+    stack.c
+    )
   set(HDRS ${HDRS}
     vtkTriangleDelaunay2D.h
-    predicates.c
-    triangle.c)
+    vtkDelaunay2D_60.h
+    vtkPolygon_81.h
+    predicates.h
+    triangle.h
+    appconst.h
+    graph.h
+    platformTime.h
+    graphEmbed.h
+    graphIO.h
+    graphIsolator.h
+    graphNonplanar.h
+    graphPreprocess.h
+    graphStructure.h
+    graphTests.h
+    listcoll.h
+    stack.h
+    )
 endif()
 #------------------------------------------------------------------------------
 

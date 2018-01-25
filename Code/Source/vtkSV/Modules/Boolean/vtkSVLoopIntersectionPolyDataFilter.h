@@ -81,9 +81,8 @@
 #define vtkSVLoopIntersectionPolyDataFilter_h
 
 #include "vtkPolyDataAlgorithm.h"
-#include "vtkSVBooleanModule.h" // For export macro
 
-class VTKSVBOOLEAN_EXPORT vtkSVLoopIntersectionPolyDataFilter :
+class vtkSVLoopIntersectionPolyDataFilter :
         public vtkPolyDataAlgorithm
 {
 public:
@@ -164,6 +163,13 @@ public:
                                           int &coplanar, double pt1[3],
                                           double pt2[3], double surfaceid[2],
                                           double tolerance);
+  static int TRIANGLETriangleTriangleIntersection(double p1[3], double q1[3],
+                                                  double r1[3], double p2[3],
+                                                  double q2[3], double r2[3],
+                                                  int &coplanar, int &touchedge,
+                                                  int &onedge, double pt1[3],
+                                                  double pt2[3], double surfaceid[2],
+                                                  double tolerance);
 
   /// \brief  Function to clean and check the output surfaces for bad triangles and
   /// free edges
