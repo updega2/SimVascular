@@ -84,12 +84,50 @@ include(SimVascularFunctionCheckCompilerFlags)
 #-----------------------------------------------------------------------------
 # RPATH handling
 # No objects built directly with project. Not needed!
+#----------------------------------------------------------------------------
+
 #-----------------------------------------------------------------------------
+# First process special Qt stuff
+#Find Qt!
+if(WIN32)
+  set(SV_Qt5_search_paths C:/OpenSource/Qt/Qt5.4.2/5.4/msvc2013_64_opengl/lib/cmake/Qt5
+                          C:/OpenSource/Qt5.4.2/5.4/msvc2013_64_opengl/lib/cmake/Qt5
+                          C:/Qt/Qt5.4.2/5.4/msvc2013_64_opengl/lib/cmake/Qt5
+			  C:/Qt5.4.2/5.4/msvc2013_64_opengl/lib/cmake/Qt5)
+
+  set(SV_Qt5_COMPONENTS
+    Concurrent
+    Core
+    Designer
+    Gui
+    Help
+    OpenGL
+    PrintSupport
+    Script
+    Sql
+    Svg
+    WebKitWidgets
+    WebKit
+    Widgets
+    Xml
+    XmlPatterns
+    UiTools)
+  find_package(Qt5 PATHS ${SV_Qt5_search_paths} COMPONENTS ${SV_Qt5_COMPONENTS} REQUIRED)
+
+  # need toplevel Qt dir path
+  get_filename_component(qt5_installed_prefix "${Qt5_DIR}/../../.." ABSOLUTE)
+endif()
+
 
 #-----------------------------------------------------------------------------
 # Externals!
 set(SV_EXTERNALS_TOPLEVEL_BIN_DIR "${CMAKE_BINARY_DIR}/Externals-build/sv_externals/bin")
 set(SV_EXTERNALS_ADDITIONAL_CMAKE_ARGS "" CACHE STRING "If more options want to be provided to the sv_externals build, they can be with this string")
+if(WIN32)
+  list(APPEND SV_EXTERNALS_PLATFORM_SPECIFIC_ARGS
+    -DSV_EXTERNALS_PYTHON_VERSION:STRING=2.7.13
+    )
+endif()
 ExternalProject_Add(Externals
   SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Externals
   BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/Externals-build
@@ -106,6 +144,7 @@ ExternalProject_Add(Externals
     -DBUILD_TESTING:BOOL=OFF
     -DBUILD_EXAMPLES:BOOL=OFF
     -DSV_EXTERNALS_TOPLEVEL_BIN_DIR:PATH=${SV_EXTERNALS_TOPLEVEL_BIN_DIR}
+    ${SV_EXTERNALS_PLATFORM_SPECIFIC_ARGS}
     ${SV_EXTERNALS_ADDITIONAL_CMAKE_ARGS}
     )
 #-----------------------------------------------------------------------------
@@ -120,6 +159,14 @@ else()
 endif()
 
 set(SV_ADDITIONAL_CMAKE_ARGS "" CACHE STRING "If more options want to be provided to the sv_externals build, they can be with this string")
+if(WIN32)
+  list(APPEND SV_PLATFORM_SPECIFIC_ARGS
+    -DQt5_DIR:PATH=${Qt5_DIR}
+    -DQT_DLL_PATH:PATH=${qt5_installed_prefix}/bin
+    -DQT_PLUGIN_PATH:PATH=${qt5_installed_prefix}/plugins
+    -DPYTHON_VERSION:STRING=2.7.13
+    )
+endif()
 ExternalProject_Add(SimVascular
   SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Code
   BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/SimVascular-build
@@ -155,8 +202,7 @@ ExternalProject_Add(SimVascular
     -DSV_USE_TETGEN_ADAPTOR:BOOL=ON
     -DSV_EXTERNALS_USE_TOPLEVEL_BIN_DIR:BOOL=ON
     -DSV_EXTERNALS_TOPLEVEL_BIN_DIR:PATH=${SV_EXTERNALS_TOPLEVEL_BIN_DIR}
-    -DQT_DLL_PATH:PATH=${qt5_installed_prefix}/bin
-    -DQT_PLUGIN_PATH:PATH=${qt5_installed_prefix}/plugins
+    ${SV_PLATFORM_SPECIFIC_ARGS}
     ${SV_ADDITIONAL_CMAKE_ARGS}
     )
 #-----------------------------------------------------------------------------
