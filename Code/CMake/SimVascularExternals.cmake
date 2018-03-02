@@ -1,5 +1,9 @@
-# Copyright (c) 2014-2015 The Regents of the University of California.
+# Copyright (c) Stanford University, The Regents of the University of
+#               California, and others.
+#
 # All Rights Reserved.
+#
+# See Copyright-SimVascular.txt for additional details.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -25,61 +29,6 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #-----------------------------------------------------------------------------
-# QT
-# First process Qt which is required to build the qt gui but is very different
-# then simvascular's other dependencies. The other externals can be built
-# as part of the externals packages of simvascular. Qt is always installed as
-# pre-built libs and bins
-if(SV_USE_QT_GUI)
-  # Qt5 modules to load
-  set(SV_Qt5_COMPONENTS
-    Concurrent
-    Core
-    Designer
-    Gui
-    Help
-    OpenGL
-    PrintSupport
-    Script
-    Sql
-    Svg
-    WebKitWidgets
-    WebKit
-    Widgets
-    Xml
-    XmlPatterns
-    UiTools)
-  # Prefix path helper if needed
-  set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" CACHE PATH "")
-  # Find Qt
-  simvascular_external(Qt5 COMPONENTS ${SV_Qt5_COMPONENTS} REQUIRED)
-  # Get toplevel Qt dir from location of config file
-  if(Qt5_DIR)
-    get_filename_component(_Qt5_DIR "${Qt5_DIR}/../../../" ABSOLUTE)
-    list(FIND CMAKE_PREFIX_PATH "${_Qt5_DIR}" _result)
-    if(_result LESS 0)
-      set(CMAKE_PREFIX_PATH "${_Qt5_DIR};${CMAKE_PREFIX_PATH}" CACHE PATH "" FORCE)
-    endif()
-  endif()
-  # Need to set include dirs and libraries of Qt from individual components
-  if(NOT SV_USE_MITK_CONFIG)
-    set(QT_LIBRARIES "")
-    set(QT_INCLUDE_DIRS "")
-    foreach(comp ${SV_Qt5_COMPONENTS})
-      if(Qt5${comp}_LIBRARIES)
-        set(QT_LIBRARIES ${QT_LIBRARIES} ${Qt5${comp}_LIBRARIES})
-      endif()
-      if(Qt5${comp}_INCLUDE_DIRS)
-        set(QT_INCLUDE_DIRS ${QT_INCLUDE_DIRS} ${Qt5${comp}_INCLUDE_DIRS})
-      endif()
-    endforeach()
-    include_directories(${QT_INCLUDE_DIRS})
-
-  endif()
-endif()
-#-----------------------------------------------------------------------------
-
-#-----------------------------------------------------------------------------
 # Process each external in the order they were added to SV_EXTERNALS_LIST
 # using simvascular_add_new_external in SimVascularOptions.cmake
 foreach(proj ${SV_EXTERNALS_LIST})
@@ -88,7 +37,7 @@ foreach(proj ${SV_EXTERNALS_LIST})
       include("${SV_SOURCE_DIR}/CMake/Externals/${proj}.cmake")
     endif()
     # Install
-    if(SV_USE_${proj}_SHARED AND SV_EXTERNALS_USE_TOPLEVEL_DIR)
+    if(SV_USE_${proj}_SHARED AND SV_EXTERNALS_USE_TOPLEVEL_BIN_DIR)
       simvascular_install_external(${proj})
     endif()
   endif()

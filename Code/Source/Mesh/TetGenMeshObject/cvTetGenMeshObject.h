@@ -1,7 +1,9 @@
-/*=========================================================================
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * Copyright (c) 2014-2015 The Regents of the University of California.
  * All Rights Reserved.
+ *
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +27,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *=========================================================================*/
+ */
 
 /** @file cvTetGenMeshObject.h
  *  @brief Class provides implementations of the TetGen Mesh type
@@ -96,8 +97,12 @@ class SV_EXPORT_TETGEN_MESH cvTetGenMeshObject : public cvMeshObject {
   } TGoptions;
 
   public:
-
+  #ifdef SV_USE_TCL
   cvTetGenMeshObject( Tcl_Interp *interp ); // default constructor
+  #endif
+  #ifdef SV_USE_PYTHON
+  cvTetGenMeshObject(); // default constructor for python
+  #endif
 
   cvTetGenMeshObject( const cvTetGenMeshObject& sm); //copy constructor
 
@@ -108,7 +113,12 @@ class SV_EXPORT_TETGEN_MESH cvTetGenMeshObject : public cvMeshObject {
   int SetSolidFileName( const char* solidFileName );
 
   int Update();
+  #ifdef SV_USE_TCL
   int Print();
+  #endif
+  #ifdef SV_USE_PYTHON
+  int pyPrint();
+  #endif
   cvMeshObject *Copy() const;
 
   // Routines promoted to abstract class from concrete implementation
@@ -170,7 +180,9 @@ class SV_EXPORT_TETGEN_MESH cvTetGenMeshObject : public cvMeshObject {
   char meshFileName_[MAXPATHLEN];
   char solidFileName_[MAXPATHLEN];
 
+  #ifdef SV_USE_TCL
   Tcl_Interp* interp_;
+  #endif
   int loadedVolumeMesh_;
   int numModelRegions_ ;
   int numBoundaryRegions_;

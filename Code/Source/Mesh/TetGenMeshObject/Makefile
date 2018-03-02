@@ -1,9 +1,11 @@
 # Hey emacs, this is a -*- makefile -*-
 
-# =========================================================================
+# Copyright (c) Stanford University, The Regents of the University of
+#               California, and others.
 #
-# Copyright (c) 2014-2015 The Regents of the University of California.
 # All Rights Reserved.
+#
+# See Copyright-SimVascular.txt for additional details.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,8 +29,6 @@
 # LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-# =========================================================================*/
 
 TOP=../../../../BuildWithMake
 
@@ -37,7 +37,8 @@ include $(TOP)/include.mk
 CXXFLAGS = $(GLOBAL_CXXFLAGS) \
 	   $(LOCAL_INCDIR) \
 	   $(VTK_INCDIRS) \
-	   $(TCLTK_INCDIR)
+	   $(TCLTK_INCDIR) \
+	   $(PYTHON_INCDIR)
 
 CREATE_EXPORTS_CV_ALL_CAPS=SV_TETGEN_MESH
 CREATE_EXPORTS_CV_EXPORT_NAME=SV_EXPORT_TETGEN_MESH
@@ -72,8 +73,10 @@ CXXSRCS	= cvTetGenMeshObject.cxx \
           cvTetGenMeshSystem.cxx cv_tetgenmesh_utils.cxx
 
 DLLHDRS = cv_tetgen_mesh_init.h
-
 DLLSRCS = cv_tetgen_mesh_init.cxx
+
+SVPYHDRS = cv_tetgen_mesh_init_py.h
+SVPYSRCS = cv_tetgen_mesh_init_py.cxx
 
 DLLLIBS = $(SVLIBFLAG)$(SV_LIB_MMG_MESH_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_POLYDATA_SOLID_NAME)$(LIBLINKEXT) \
@@ -85,6 +88,8 @@ DLLLIBS = $(SVLIBFLAG)$(SV_LIB_MMG_MESH_NAME)$(LIBLINKEXT) \
           $(TETGEN_LIBS) $(VMTK_LIBS) $(SV_MMG_LIBS) $(ZLIB_LIBS)
 
 TARGET_LIB_NAME = $(SV_LIB_TETGEN_MESH_NAME)
+
+SV_PYTHON_MODULE_NAME = pyMeshTetgen
 
 include $(TOP)/targetlib.mk
 

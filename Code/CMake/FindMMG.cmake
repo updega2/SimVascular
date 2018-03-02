@@ -1,3 +1,33 @@
+# Copyright (c) Stanford University, The Regents of the University of
+#               California, and others.
+#
+# All Rights Reserved.
+#
+# See Copyright-SimVascular.txt for additional details.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject
+# to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+# IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+# PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+# OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 ## =============================================================================
 ##  This file is part of the mmg software package for the tetrahedral
 ##  mesh modification.
@@ -30,41 +60,50 @@
 #
 # TARGET_LINK_LIBRARIES( ${YOUR_TARGET} ${MMG_LIBRARY})
 
+set(proj MMG)
 
-if((NOT WIN32) AND (NOT WIN64))
-  set( MMG_INCLUDE_DIR MMG_INCLUDE_DIR-NOTFOUND )
-  set( MMG_LIBRARY MMG_LIBRARY-NOTFOUND )
+include(FindPackageHandleStandardArgs)
+include(CMakeFindFrameworks)
+
+if(NOT ${proj}_DIR)
+  set(${proj}_DIR "${proj}_DIR-NOTFOUND" CACHE PATH "Path of toplevel ${proj} dir. Specify this if ${proj} cannot be found.")
+  message(FATAL_ERROR "${proj}_DIR was not specified. Set ${proj}_DIR to the toplevel ${proj} dir that contains bin, lib, include")
 endif()
 
-find_path(MMG_INCLUDE_DIR
-  NAMES mmg/libmmg.h
-  HINTS ${MMG_INCLUDE_DIR}
-  $ENV{MMG_INCLUDE_DIR}
-  $ENV{HOME}/include/
-  ${MMG_DIR}/include/
-  ${SV_EXTERNALS_TOPLEVEL_DIR}/${SV_EXT_MMG_BIN_DIR}/include
-  ${MMG_DIR}/simvascular/include/
-  $ENV{MMG_DIR}/include/
-  PATH_SUFFIXES
-  DOC "Directory of mmg Headers")
-
-# Check for mmg library
-find_library(MMG_LIBRARY
-  NAMES mmg mmg${MMG_LIB_SUFFIX}
-  HINTS ${MMG_LIBRARY}
-  $ENV{MMG_LIBRARY}
-  $ENV{HOME}/lib
-  ${MMG_DIR}/lib
-  ${SV_EXTERNALS_TOPLEVEL_DIR}/${SV_EXT_MMG_BIN_DIR}/lib
-  ${MMG_DIR}/simvascular/lib
-  $ENV{MMG_DIR}/lib
-  DOC "The mmg library"
+set(${proj}_POSSIBLE_INCLUDE_PATHS
+  "${${proj}_DIR}/*"
+  "${${proj}_DIR}/include/*"
   )
 
-set(MMG_DIR "${MMG_DIR}" CACHE PATH "Path to top level libraries.  Specify this if MMG cannot be found.")
-include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(MMG
-	FOUND_VAR MMG_FOUND
-	REQUIRED_VARS MMG_INCLUDE_DIR MMG_LIBRARY
-	FAIL_MESSAGE "Could NOT find MMG")
+unset(${proj}_INCLUDE_DIR CACHE)
+find_path(${proj}_INCLUDE_DIR
+  NAMES
+  mmg/libmmg.h
+  PATHS
+  ${${proj}_POSSIBLE_INCLUDE_PATHS}
+  NO_DEFAULT_PATH
+  )
 
+set(${proj}_POSSIBLE_LIB_PATHS
+  "${${proj}_DIR}/*"
+  "${${proj}_DIR}/lib/*"
+  )
+
+# Check for mmg library
+unset(${proj}_LIBRARY CACHE)
+find_library(${proj}_LIBRARY
+  NAMES
+  mmg
+  PATHS
+  ${${proj}_POSSIBLE_LIB_PATHS}
+  )
+
+find_package_handle_standard_args(${proj}
+	FOUND_VAR ${proj}_FOUND
+	REQUIRED_VARS ${proj}_INCLUDE_DIR ${proj}_LIBRARY
+	FAIL_MESSAGE "Could NOT find ${proj}")
+
+mark_as_advanced(
+  ${proj}_INCLUDE_DIR
+  ${proj}_LIBRARY
+  )

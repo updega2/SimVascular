@@ -1,5 +1,9 @@
-# Copyright (c) 2014-2015 The Regents of the University of California.
+# Copyright (c) Stanford University, The Regents of the University of
+#               California, and others.
+#
 # All Rights Reserved.
+#
+# See Copyright-SimVascular.txt for additional details.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -29,34 +33,43 @@
 set(proj PYTHON)
 
 if(SV_USE_${proj})
+
   # If using toplevel dir, foce PYTHON_DIR to be the SV_PYTHON_DIR set by the
   # simvascular_add_new_external macro
-  if(SV_EXTERNALS_USE_TOPLEVEL_DIR)
+  if(SV_EXTERNALS_USE_TOPLEVEL_BIN_DIR)
     set(${proj}_DIR ${SV_${proj}_DIR} CACHE PATH "Force ${proj} dir to externals" FORCE)
   endif()
+
   # Find Python
   if(NOT WIN32)
-  simvascular_external(${proj} SHARED_LIB ${SV_USE_${proj}_SHARED} VERSION ${${proj}_VERSION})
-  # Set SV_PYTHON_DIR to the directory that was found to contain PYTHON
-  set(SV_${proj}_DIR ${${proj}_DIR})
+
+    simvascular_external(${proj}
+      SHARED_LIB ${SV_USE_${proj}_SHARED}
+      VERSION ${${proj}_VERSION}
+      REQUIRED
+      )
+
+    # Set SV_PYTHON_DIR to the directory that was found to contain PYTHON
+    set(SV_${proj}_DIR ${${proj}_DIR})
   endif()
 
   if(WIN32)
-  message("manually set PYTHON variables ${SV_${proj}_DIR}")
-  set(PYTHON_DEBUG_LIBRARY "" CACHE FILEPATH "doc string" FORCE)
-  set(PYTHON_INCLUDE_DIR   ${SV_${proj}_DIR}/include CACHE PATH "doc string" FORCE)
-  set(PYTHON_INCLUDE_PATH  ${SV_${proj}_DIR}/include CACHE PATH "doc string" FORCE)
-  set(PYTHON_LIBRARY       ${SV_${proj}_DIR}/libs/python27.lib CACHE FILEPATH "doc string" FORCE)
-  set(PYTHON_LIBRARY_DEBUG "" CACHE FILEPATH "doc string" FORCE)
-  set(PYTHON_SITE_PACKAGES ${SV_${proj}_DIR}/lib/site-packages CACHE PATH "doc string" FORCE)
-  set(PYTHON_CORE_PACKAGES ${SV_${proj}_DIR}/lib CACHE PATH "doc string" FORCE)
-  set(PYTHON_DLL_PATH      ${SV_${proj}_DIR}/bin CACHE PATH "doc string" FORCE)
-  set(PYTHON_EXECUTABLE    ${SV_${proj}_DIR}/bin/python.exe CACHE FILEPATH "doc string" FORCE)
-  link_directories(${${proj}_LIBRARY})
-  include_directories(${${proj}_INCLUDE_DIR})
+    message("manually set PYTHON variables ${SV_${proj}_DIR}")
+    set(PYTHON_DEBUG_LIBRARY "" CACHE FILEPATH "doc string" FORCE)
+    set(PYTHON_INCLUDE_DIR   ${SV_${proj}_DIR}/include CACHE PATH "doc string" FORCE)
+    set(PYTHON_INCLUDE_PATH  ${SV_${proj}_DIR}/include CACHE PATH "doc string" FORCE)
+    set(PYTHON_LIBRARY       ${SV_${proj}_DIR}/libs/python27.lib CACHE FILEPATH "doc string" FORCE)
+    set(PYTHON_LIBRARY_DEBUG "" CACHE FILEPATH "doc string" FORCE)
+    set(PYTHON_SITE_PACKAGES ${SV_${proj}_DIR}/lib/site-packages CACHE PATH "doc string" FORCE)
+    set(PYTHON_CORE_PACKAGES ${SV_${proj}_DIR}/lib CACHE PATH "doc string" FORCE)
+    set(PYTHON_DLL_PATH      ${SV_${proj}_DIR}/bin CACHE PATH "doc string" FORCE)
+    set(PYTHON_EXECUTABLE    ${SV_${proj}_DIR}/bin/python.exe CACHE FILEPATH "doc string" FORCE)
+    link_directories(${${proj}_LIBRARY})
+    include_directories(${${proj}_INCLUDE_DIR})
   endif()
 
   # Need to make sure we pick up python module from vtk
   set(VTK_${proj}_MODULES vtkWrappingPythonCore)
+
 endif()
 #-----------------------------------------------------------------------------

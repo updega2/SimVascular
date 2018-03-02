@@ -1,7 +1,9 @@
-/*=========================================================================
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * Copyright (c) 2014-2015 The Regents of the University of California.
  * All Rights Reserved.
+ *
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +27,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *=========================================================================*/
+ */
 
 /** @file cvTetGenMeshSystem.cxx
  *  @brief The implementations of functions in cvTetGenMeshSystem
@@ -68,9 +69,15 @@ int cvTetGenMeshSystem::LogOff()
  *  @brief Function to create and return a new mesh system. called once
  *  upon startup of SimVascular
  */
-
+#ifdef SV_USE_TCL
 cvMeshObject* cvTetGenMeshSystem::CreateMeshObject( Tcl_Interp *interp )
 {
   return new cvTetGenMeshObject(interp);
 }
-
+#endif
+#ifdef SV_USE_PYTHON
+cvMeshObject* cvTetGenMeshSystem::CreateMeshObject()
+{
+  return new cvTetGenMeshObject();
+}
+#endif

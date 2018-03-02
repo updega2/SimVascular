@@ -1,18 +1,11 @@
 # Hey emacs, this is a -*- makefile -*-
 
-# =========================================================================
+# Copyright (c) Stanford University, The Regents of the University of
+#               California, and others.
 #
-# Copyright (c) 2014 The Regents of the University of California.
 # All Rights Reserved.
 #
-# Copyright (c) 2009-2011 Open Source Medical Software Corporation,
-#                         University of California, San Diego.
-#
-# Portions of the code Copyright (c) 1998-2007 Stanford University,
-# Charles Taylor, Nathan Wilson, Ken Wang.
-#
-# See SimVascular Acknowledgements file for additional
-# contributors to the source code.
+# See Copyright-SimVascular.txt for additional details.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -25,15 +18,17 @@
 # The above copyright notice and this permission notice shall be included
 # in all copies or substantial portions of the Software.
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-# OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-# =========================================================================*/
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+# IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+# PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+# OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 TOP=../../../../BuildWithMake
 
@@ -47,6 +42,7 @@ CXXFLAGS = $(GLOBAL_CXXFLAGS) \
 	   $(LOCAL_INCDIR) \
 	   $(VTK_INCDIRS) \
 	   $(TCLTK_INCDIR) \
+	   $(PYTHON_INCDIR) \
            $(OPENCASCADE_INCDIR)
 
 CREATE_EXPORTS_CV_ALL_CAPS=SV_MESHSIM_MESH
@@ -84,8 +80,10 @@ CXXSRCS	= cvMeshSimMeshObject.cxx \
           cvMeshSimMeshSystem.cxx stats.cxx scorecXYZ.cxx
 
 DLLHDRS = cv_meshsim_mesh_init.h
-
 DLLSRCS = cv_meshsim_mesh_init.cxx
+
+SVPYHDRS = cv_meshsim_mesh_init_py.h
+SVPYSRCS = cv_meshsim_mesh_init_py.cxx
 
 DLLLIBS = $(SVLIBFLAG)$(SV_LIB_SOLID_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MESH_NAME)$(LIBLINKEXT) \
@@ -153,6 +151,8 @@ DLLLIBS +=  $(VMTK_LIBS)
 DLLLIBS += $(VTK_LIBS)
 
 TARGET_LIB_NAME = $(SV_LIB_MESHSIM_MESH_NAME)
+
+SV_PYTHON_MODULE_NAME = pyMeshSim
 
 include $(TOP)/targetlib.mk
 

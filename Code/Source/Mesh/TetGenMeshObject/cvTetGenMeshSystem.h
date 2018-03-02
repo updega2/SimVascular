@@ -1,7 +1,9 @@
-/*=========================================================================
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * Copyright (c) 2014-2015 The Regents of the University of California.
  * All Rights Reserved.
+ *
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +27,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *=========================================================================*/
+ */
 
 /** @file cvTetGenMeshSystem.h
  *  @brief Class derived from cvMeshSystem that is used to set up TetGen
@@ -59,7 +60,12 @@ public:
   int LogOff();
 
 protected:
+  #ifdef SV_USE_TCL
   cvMeshObject* CreateMeshObject( Tcl_Interp *interp );
+  #endif
+  #ifdef SV_USE_PYTHON
+  cvMeshObject* CreateMeshObject();
+  #endif
 
 private:
 

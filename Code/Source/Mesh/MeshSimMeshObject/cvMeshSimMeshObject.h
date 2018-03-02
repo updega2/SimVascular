@@ -1,13 +1,9 @@
-/* Copyright (c) 2009-2011 Open Source Medical Software Corporation,
- *                         University of California, San Diego.
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * All rights reserved.
+ * All Rights Reserved.
  *
- * Portions of the code Copyright (c) 1998-2007 Stanford University,
- * Charles Taylor, Nathan Wilson, Ken Wang.
- *
- * See SimVascular Acknowledgements file for additional
- * contributors to the source code.
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -20,13 +16,17 @@
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef __CVMESHSIMMESHOBJECT_H
@@ -109,8 +109,12 @@ class SV_EXPORT_MESHSIM_MESH cvMeshSimMeshObject : public cvMeshObject {
   } MSoptions;
 
   public:
-
+  #ifdef SV_USE_TCL
   cvMeshSimMeshObject( Tcl_Interp *interp ); // default constructor
+  #endif
+  #ifdef SV_USE_PYTHON
+  cvMeshSimMeshObject(); // default constructor for python
+  #endif
   cvMeshSimMeshObject( const cvMeshSimMeshObject& sm );  // copy constructor
   ~cvMeshSimMeshObject();
 
@@ -125,6 +129,7 @@ class SV_EXPORT_MESHSIM_MESH cvMeshSimMeshObject : public cvMeshObject {
   int InitTraversal();
   int Update();
   int Print();
+  int pyPrint();
   // the copy command probably doesn't work right!
   cvMeshObject *Copy() const;
 
@@ -206,7 +211,9 @@ class SV_EXPORT_MESHSIM_MESH cvMeshSimMeshObject : public cvMeshObject {
 #else
   int part_;
 #endif
+  #ifdef SV_USE_TCL
   Tcl_Interp* interp_;
+  #endif
   int loadedVolumeMesh_;
   pRegion pCurrentMeshRegion_;
   //int* nodemap_;

@@ -1,5 +1,9 @@
-# Copyright (c) 2014-2015 The Regents of the University of California.
+# Copyright (c) Stanford University, The Regents of the University of
+#               California, and others.
+#
 # All Rights Reserved.
+#
+# See Copyright-SimVascular.txt for additional details.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -29,15 +33,21 @@
 set(proj TCL)
 # If using toplevel dir, foce TCL_DIR to be the SV_TCL_DIR set by the
 # simvascular_add_new_external macro
-if(SV_EXTERNALS_USE_TOPLEVEL_DIR)
+if(SV_EXTERNALS_USE_TOPLEVEL_BIN_DIR)
   set(${proj}_DIR ${SV_${proj}_DIR} CACHE PATH "Force ${proj} dir to externals" FORCE)
 endif()
 
 # Find TCL
 if(NOT WIN32)
-simvascular_external(${proj} SHARED_LIB ${SV_USE_${proj}_SHARED} VERSION ${${proj}_VERSION})
-# Set SV_TCL_DIR to the directory that was found to contain TCL
-set(SV_${proj}_DIR ${${proj}_DIR})
+  simvascular_external(${proj}
+    SHARED_LIB ${SV_USE_${proj}_SHARED}
+    VERSION ${${proj}_VERSION}
+    REQUIRED
+    )
+
+  # Set SV_TCL_DIR to the directory that was found to contain TCL
+  set(SV_${proj}_DIR ${${proj}_DIR})
+
 endif()
 
 if(WIN32)

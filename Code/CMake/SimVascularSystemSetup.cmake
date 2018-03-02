@@ -1,5 +1,9 @@
-# Copyright (c) 2014-2015 The Regents of the University of California.
+# Copyright (c) Stanford University, The Regents of the University of
+#               California, and others.
+#
 # All Rights Reserved.
+#
+# See Copyright-SimVascular.txt for additional details.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -244,13 +248,14 @@ set(SV_BINARY_DISTRIBUTION_DIR ${SV_BINARY_HOME}/Distribution)
 # Set a default build type (if none was specified)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 	message(STATUS "Setting build type to 'RelWithDebInfo' as none was specified.")
-	set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build." FORCE)
+	set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build.")
 	mark_as_advanced(CMAKE_BUILD_TYPE)
 	# Set the possible values of build type for cmake-gui
 	set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
 		"MinSizeRel" "RelWithDebInfo")
 endif()
-set(SV_BUILD_TYPE_DIR "${CMAKE_BUILD_TYPE}" CACHE STRING "The compile type being used.")
+string(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER)
+set(SV_BUILD_TYPE_DIR "${CMAKE_BUILD_TYPE_LOWER}" CACHE STRING "The compile type being used.")
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

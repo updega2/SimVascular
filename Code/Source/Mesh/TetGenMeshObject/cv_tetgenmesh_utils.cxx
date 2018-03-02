@@ -1,7 +1,9 @@
-/*=========================================================================
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * Copyright (c) 2014-2015 The Regents of the University of California.
  * All Rights Reserved.
+ *
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +27,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *=========================================================================*/
+ */
 
 /** @file cv_tetgenmesh_utils.cxx
  *  @brief The implementations of functions in cv_tetgenmesh_utils
@@ -176,7 +177,7 @@ int TGenUtils_AddPointSizingFunction(tetgenio *inmesh,vtkPolyData *polydatasolid
   if (VtkUtils_PDCheckArrayName(polydatasolid, 0, meshSizingFunctionName) != SV_OK)
   {
     fprintf(stderr,"Array name 'MeshSizingFunction' does not exist. \
-        Something may have gone wrong when setting up BL");
+        Something may have gone wrong when setting up BL\n");
     return SV_ERROR;
   }
   vtkDoubleArray *meshSizingFunction = vtkDoubleArray::SafeDownCast(

@@ -1,16 +1,9 @@
-/*=========================================================================
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * Copyright (c) 2014 The Regents of the University of California.
  * All Rights Reserved.
  *
- * Copyright (c) 2009-2011 Open Source Medical Software Corporation,
- *                         University of California, San Diego.
- *
- * Portions of the code Copyright (c) 1998-2007 Stanford University,
- * Charles Taylor, Nathan Wilson, Ken Wang.
- *
- * See SimVascular Acknowledgements file for additional
- * contributors to the source code.
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,15 +16,18 @@
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- *=========================================================================*/
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include "SimVascular.h"
 #include "cvMeshSimMeshObject.h"
@@ -76,7 +72,7 @@ void SimVascularMeshSimMessageHandler(int type, const char *msg) {
 // -----------
 // cvMeshSimMeshObject
 // -----------
-
+#ifdef SV_USE_TCL
 cvMeshSimMeshObject::cvMeshSimMeshObject(Tcl_Interp *interp)
   : cvMeshObject()
 {
@@ -128,7 +124,62 @@ cvMeshSimMeshObject::cvMeshSimMeshObject(Tcl_Interp *interp)
   phasta_solution  = NULL;
 #endif
 }
+#endif
+// -----------
+// cvMeshSimMeshObject for python
+// -----------
+#ifdef SV_USE_PYTHON
+cvMeshSimMeshObject::cvMeshSimMeshObject()
+: cvMeshObject()
+{
+mesh = NULL;
+model = NULL;
+meshloaded_ = 0;
+loadedVolumeMesh_ = 0;
+quadElem_ = 0;
+//nodemap_ = NULL;
+pts_ = NULL;
 
+meshFileName_[0] = '\0';
+solidFileName_[0] = '\0';
+
+ptrNodes_ = NULL;
+ptrEdges_ = NULL;
+ptrElements_ = NULL;
+ptrModelRegions_ = NULL;
+
+case_ = NULL;
+progress_ = Progress_new();
+Progress_setDefaultCallback(progress_);
+
+#ifdef SV_USE_MESHSIM_DISCRETE_MODEL
+discreteModel_ = NULL;
+#endif
+
+solidmodeling_kernel_ = SM_KT_PARASOLID;
+
+meshoptions_.surface = 0;
+meshoptions_.volume = 0;
+meshoptions_.surface_optimization = 1;
+meshoptions_.surface_smoothing = 3;
+meshoptions_.volume_optimization = 1;
+meshoptions_.volume_smoothing = 1;
+meshoptions_.gsize_type = 0;
+meshoptions_.gsize = 0.0;
+meshoptions_.gcurv_type = 0;
+meshoptions_.gcurv = 0.0;
+meshoptions_.gmincurv_type = 0;
+meshoptions_.gmincurv = 0.0;
+
+#ifdef SV_USE_MESHSIM_ADAPTOR
+errorIndicatorID = NULL;
+modes            = NULL;
+nodalhessianID   = NULL;
+nodalgradientID  = NULL;
+phasta_solution  = NULL;
+#endif
+}
+#endif
 // -----------
 // cvMeshSimMeshObject
 // -----------
@@ -267,6 +318,61 @@ int cvMeshSimMeshObject::Print()
   return SV_OK;
 }
 
+// -----
+// pyPrint
+// -----
+
+int cvMeshSimMeshObject::pyPrint()
+{
+   /* output the statistics */
+  int num_verts = M_numVertices (mesh);
+  int num_elems = M_numRegions (mesh);
+  int nMeshEdges = M_numEdges (mesh);
+  int nMeshFaces = M_numFaces (mesh);
+
+  int nRegion = GM_numRegions (model);
+  int nFace = GM_numFaces (model);
+  int nEdge = GM_numEdges (model);
+  int nVertex = GM_numVertices (model);
+
+  // vertices are the nodes for the linear elements,
+  // for quadratic elements we need to count the edges
+  // as well.
+  int num_nodes = num_verts;
+  if (quadElem_ == 1) {
+    num_nodes += nMeshEdges;
+  }
+
+  fprintf(stdout,"\nMESH STATISTICS:\n");
+  fprintf(stdout,"  elements         = %i\n",num_elems);
+  fprintf(stdout,"  nodes            = %i\n",num_nodes);
+  fprintf(stdout,"  mesh edges       = %i\n",nMeshEdges);
+  fprintf(stdout,"  mesh faces       = %i\n",nMeshFaces);
+  fprintf(stdout,"\nMODEL STATISTICS:\n");
+  fprintf(stdout,"  material regions = %i\n",nRegion);
+  fprintf(stdout,"  edges            = %i\n",nEdge);
+  fprintf(stdout,"  vertices         = %i\n\n",nVertex);
+
+  for (int i=0; i < numModelRegions_ ; i++) {
+    fprintf(stdout,"regionID_[%i]: %i\n",i,regionID_[i]);
+  }
+
+  char rtnstr[2048];
+  rtnstr[0]='\0';
+  sprintf(rtnstr,"number_of_nodes %i",num_nodes);
+  PySys_WriteStdout(rtnstr);
+  rtnstr[0]='\0';
+  sprintf(rtnstr,"number_of_elements %i",num_elems);
+  PySys_WriteStdout(rtnstr);
+  rtnstr[0]='\0';
+  sprintf(rtnstr,"number_of_mesh_edges %i",nMeshEdges);
+  PySys_WriteStdout(rtnstr);
+  rtnstr[0]='\0';
+  sprintf(rtnstr,"number_of_mesh_faces %i",nMeshFaces);
+  PySys_WriteStdout(rtnstr);
+
+  return SV_OK;
+}
 
 // ----
 // Copy

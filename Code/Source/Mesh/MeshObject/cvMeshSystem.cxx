@@ -1,16 +1,9 @@
-/*=========================================================================
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * Copyright (c) 2014-2015 The Regents of the University of California.
  * All Rights Reserved.
  *
- * Copyright (c) 2009-2011 Open Source Medical Software Corporation,
- *                         University of California, San Diego.
- *
- * Portions of the code Copyright (c) 1998-2007 Stanford University,
- * Charles Taylor, Nathan Wilson, Ken Wang.
- *
- * See SimVascular Acknowledgements file for additional
- * contributors to the source code.
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,15 +16,18 @@
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- *=========================================================================*/
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include "SimVascular.h"
 
@@ -127,7 +123,7 @@ int cvMeshSystem::RegisterKernel( cvMeshObject::KernelType kernel_type, cvMeshSy
 // registered in the repository.  Subsequent cvMeshSystem lookup's
 // currently DO NOT check for NULL values.  The idea is that objects
 // are checked for validity *before* they get registered.
-
+#ifdef SV_USE_TCL
 cvMeshObject* cvMeshSystem::DefaultInstantiateMeshObject( Tcl_Interp *interp,
                                                           char *const meshFileName,
                                                           char *const solidFileName )
@@ -159,4 +155,42 @@ cvMeshObject* cvMeshSystem::DefaultInstantiateMeshObject( Tcl_Interp *interp,
 
   return meshObject;
 }
+#endif
+// ----------------------------
+// DefaultInstantiateMeshObject for python
+// ----------------------------
+#ifdef SV_USE_PYTHON
+cvMeshObject* cvMeshSystem::DefaultInstantiateMeshObject(
+  char *const meshFileName,
+  char *const solidFileName )
+{
+cvMeshSystem* meshSystem = NULL;
+cvMeshObject* meshObject = NULL;
+if (gCurrentKernel == cvMeshObject::KERNEL_MESHSIM || gCurrentKernel == cvMeshObject::KERNEL_TETGEN)
+{
+  if (gMeshSystems[gCurrentKernel] == NULL)
+  {
+    fprintf( stdout, "current kernel is not available");
+    return NULL;
+  }
+  meshSystem = gMeshSystems[gCurrentKernel];
 
+  meshObject = (cvMeshObject *) (meshSystem->CreateMeshObject());
+  if (meshObject == NULL)
+  {
+    fprintf( stdout, "Unable to create mesh object");
+  }
+  else
+  {
+    meshObject->SetMeshFileName( meshFileName );
+    meshObject->SetSolidFileName( solidFileName );
+  }
+}
+else
+{
+  fprintf(stdout,"current kernel is not valid");
+}
+
+return meshObject;
+}
+#endif

@@ -1,16 +1,9 @@
-/*=========================================================================
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * Copyright (c) 2014-2015 The Regents of the University of California.
  * All Rights Reserved.
  *
- * Copyright (c) 2009-2011 Open Source Medical Software Corporation,
- *                         University of California, San Diego.
- *
- * Portions of the code Copyright (c) 1998-2007 Stanford University,
- * Charles Taylor, Nathan Wilson, Ken Wang.
- *
- * See SimVascular Acknowledgements file for additional
- * contributors to the source code.
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,15 +16,18 @@
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- *=========================================================================*/
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include "SimVascular.h"
 
@@ -39,6 +35,10 @@
 //#include "cvTetGenAdapt.h"
 #include "cvMeshObject.h"
 #include "cv_misc_utils.h"
+
+#ifdef SV_USE_PYTHON
+#include "Python.h"
+#endif
 
 #include <string.h>
 #include <assert.h>
@@ -62,7 +62,7 @@ cvAdaptObject::~cvAdaptObject()
 // ----------------------------
 // DefaultInstantiateAdaptObject
 // ----------------------------
-
+#ifdef SV_USE_TCL
 cvAdaptObject* cvAdaptObject::DefaultInstantiateAdaptObject( Tcl_Interp *interp,KernelType t )
 {
   // Get the adapt object factory registrar associated with this Tcl interpreter.
@@ -93,4 +93,33 @@ cvAdaptObject* cvAdaptObject::DefaultInstantiateAdaptObject( Tcl_Interp *interp,
 
   return adaptor;
 }
+#endif
+// ----------------------------
+// DefaultInstantiateAdaptObject for python
+// ----------------------------
+#ifdef SV_USE_PYTHON
+cvAdaptObject* cvAdaptObject::DefaultInstantiateAdaptObject(KernelType t )
+{
+  // Get the adapt object factory registrar associated with the python interpreter
+  cvFactoryRegistrar* adaptObjectRegistrar;
+  adaptObjectRegistrar = (cvFactoryRegistrar *) PySys_GetObject("AdaptObjectRegistrar");
+  if (adaptObjectRegistrar==NULL)
+  {
+    fprintf(stdout,"Cannot get AdaptObjectRegistrar from pySys");
+  }
+  cvAdaptObject* adaptor = NULL;
+  if (t == KERNEL_TETGEN ||
+      t == KERNEL_MESHSIM)
+  {
+    adaptor = (cvAdaptObject *) (adaptObjectRegistrar->UseFactoryMethod( t ));
+    if (adaptor == NULL) {
+		  fprintf( stdout, "Unable to create adaptor object for kernel (%i)\n",cvAdaptObject::gCurrentKernel);
+    }
 
+  } else {
+    fprintf( stdout, "current kernel is not valid (%i)\n",t);
+  }
+
+  return adaptor;
+}
+#endif

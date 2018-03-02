@@ -1,5 +1,9 @@
-# Copyright (c) 2014-2015 The Regents of the University of California.
+# Copyright (c) Stanford University, The Regents of the University of
+#               California, and others.
+#
 # All Rights Reserved.
+#
+# See Copyright-SimVascular.txt for additional details.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -1117,10 +1121,7 @@ macro(simvascular_add_new_external proj version use shared dirname)
 
   set(${proj}_VERSION "${version}" CACHE TYPE STRING)
   simvascular_get_major_minor_version(${${proj}_VERSION} ${proj}_MAJOR_VERSION ${proj}_MINOR_VERSION)
-  set(SV_EXT_${proj}_SRC_DIR ${SV_EXTERNALS_SRC_DIR}/${dirname}-${${proj}_VERSION})
-  set(SV_EXT_${proj}_BIN_DIR ${SV_EXTERNALS_BIN_DIR}/${dirname}-${${proj}_VERSION})
-  set(SV_EXT_${proj}_BLD_DIR ${SV_EXTERNALS_BLD_DIR}/${dirname}-${${proj}_VERSION})
-  set(SV_EXT_${proj}_PFX_DIR ${SV_EXTERNALS_PFX_DIR}/${dirname}-${${proj}_VERSION})
+  set(SV_EXT_${proj}_BIN_DIR ${SV_EXTERNALS_TOPLEVEL_BIN_DIR}/${dirname}-${${proj}_VERSION})
 
   # Install rules
   set(SV_EXTERNALS_${proj}_INSTALL_PREFIX ${SV_EXTERNALS_INSTALL_PREFIX}/${dirname}-${${proj}_VERSION})
@@ -1149,11 +1150,6 @@ macro(simvascular_add_new_external proj version use shared dirname)
   if(SV_USE_${proj})
     list(APPEND SV_EXTERNALS_LIST ${proj})
     set(SV_${proj}_DIR ${SV_EXT_${proj}_BIN_DIR})
-    if(NOT ${proj}_DIR)
-      set(${proj}_DIR "" CACHE PATH "For external projects with a Config.cmake file, path to that file; for externals without a Config.cmake, the path to the toplevel bin directory")
-    else()
-      set(${proj}_DIR "${${proj}_DIR}" CACHE PATH "For external projects with a Config.cmake file, path to that file; for externals without a Config.cmake, the path to the toplevel bin directory")
-    endif()
     if("${proj}" STREQUAL "MITK")
       if(SV_USE_MITK_CONFIG)
         set(SV_${proj}_DIR ${SV_EXT_${proj}_BLD_DIR}/MITK-build)
@@ -1292,8 +1288,8 @@ macro(sv_externals_add_new_external proj version use shared dirname install_dirn
   option(SV_EXTERNALS_ENABLE_${proj} "Enable ${proj} Plugin" ${use})
   option(SV_EXTERNALS_ENABLE_${proj}_SHARED "Build ${proj} libraries as shared libs" ${shared})
   mark_as_advanced(SV_EXTERNALS_ENABLE_${proj}_SHARED)
-  option(SV_EXTERNALS_DOWNLOAD_${proj} "Download instead of build ${proj}; Unused for tcl, tk, tcllib, tklib, numpy, pip" ${use})
-  mark_as_advanced(SV_EXTERNALS_DOWNLOAD_${proj})
+  option(SV_EXTERNALS_DOWNLOAD_${proj} "Download instead of build ${proj}; Unused for tcl, tk, tcllib, tklib, numpy, pip" ON)
+  #mark_as_advanced(SV_EXTERNALS_DOWNLOAD_${proj})
 
   # Version
   set(SV_EXTERNALS_${proj}_VERSION "${version}" CACHE TYPE STRING)
@@ -1338,8 +1334,9 @@ macro(sv_externals_add_new_external proj version use shared dirname install_dirn
 
   # Add install step for each external
   if(NOT "${install_dirname}" STREQUAL "none")
+    string(TOLOWER "${SV_BUILD_TYPE_DIR}" SV_BUILD_TYPE_LOWER)
     simvascular_today(YEAR MONTH DAY)
-    set(SV_EXTERNALS_${proj}_TAR_INSTALL_NAME ${SV_PLATFORM_DIR}.${SV_PLATFORM_VERSION_DIR}.${SV_COMPILER_DIR}.${SV_COMPILER_VERSION_DIR}.${SV_ARCH_DIR}.${SV_BUILD_TYPE_DIR}.${YEAR}.${MONTH}.${DAY}.${install_dirname}.${SV_EXTERNALS_${proj}_VERSION})
+    set(SV_EXTERNALS_${proj}_TAR_INSTALL_NAME ${SV_PLATFORM_DIR}.${SV_PLATFORM_VERSION_DIR}.${SV_COMPILER_DIR}.${SV_COMPILER_VERSION_DIR}.${SV_ARCH_DIR}.${SV_BUILD_TYPE_LOWER}.${YEAR}.${MONTH}.${DAY}.${install_dirname}.${SV_EXTERNALS_${proj}_VERSION})
     if(EXISTS "${SV_EXTERNALS_TAR_INSTALL_DIR}")
       install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E tar -czvf ${SV_EXTERNALS_TAR_INSTALL_DIR}/${SV_EXTERNALS_${proj}_TAR_INSTALL_NAME}.tar.gz ${SV_EXTERNALS_${proj}_BIN_DIR}
         WORKING_DIRECTORY ${SV_EXTERNALS_TOPLEVEL_BIN_DIR})")
@@ -1349,7 +1346,7 @@ macro(sv_externals_add_new_external proj version use shared dirname install_dirn
   # Set up download stuff if downloading
   if(NOT "${install_dirname}" STREQUAL "none")
     if(SV_EXTERNALS_DOWNLOAD_${proj})
-      set(${proj}_TEST_FILE "${SV_EXTERNALS_URL}/${SV_KERNEL_DIR}/${SV_PLATFORM_DIR}/externals_compiler_info.txt")
+      set(${proj}_TEST_FILE "${SV_EXTERNALS_URL}/${SV_EXTERNALS_VERSION_NUMBER}/${SV_KERNEL_DIR}/${SV_PLATFORM_DIR}/externals_compiler_info.txt")
       file(DOWNLOAD "${${proj}_TEST_FILE}" "${SV_EXTERNALS_${proj}_PFX_DIR}/externals_compiler_info.txt" STATUS _status LOG _log INACTIVITY_TIMEOUT 5 TIMEOUT 5)
       list(GET _status 0 err)
       list(GET _status 1 msg)
@@ -1359,7 +1356,7 @@ macro(sv_externals_add_new_external proj version use shared dirname install_dirn
         simvascular_read_file("${SV_EXTERNALS_${proj}_PFX_DIR}/externals_compiler_info.txt" FILE_CONTENTS)
         sv_externals_check_versioning("${FILE_CONTENTS}" ${SV_PLATFORM_VERSION_DIR} ${SV_COMPILER_DIR} ${SV_COMPILER_VERSION_DIR} SV_DOWNLOAD_DIR)
         string(REPLACE "/" "." SV_TAR_PREFIX "${SV_DOWNLOAD_DIR}")
-        set(SV_EXTERNALS_${proj}_BINARIES_URL "${SV_EXTERNALS_URL}/${SV_KERNEL_DIR}/${SV_PLATFORM_DIR}/${SV_DOWNLOAD_DIR}/${SV_PLATFORM_DIR}.${SV_TAR_PREFIX}.${install_dirname}.${SV_EXTERNALS_${proj}_VERSION}.tar.gz")
+        set(SV_EXTERNALS_${proj}_BINARIES_URL "${SV_EXTERNALS_URL}/${SV_EXTERNALS_VERSION_NUMBER}/${SV_KERNEL_DIR}/${SV_PLATFORM_DIR}/${SV_DOWNLOAD_DIR}/${SV_PLATFORM_DIR}.${SV_TAR_PREFIX}.${install_dirname}.${SV_EXTERNALS_${proj}_VERSION}.tar.gz")
       endif()
     endif()
   endif()
@@ -1367,7 +1364,7 @@ endmacro()
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# sv_externals_add_new_external
+# sv_externals_read_file
 # \brief Create new external and set variables with default values based on inputs
 macro(simvascular_read_file file_name file_contents)
   file(READ "${file_name}" ${file_contents})
@@ -1471,7 +1468,9 @@ macro(sv_externals_check_versioning check_file_contents platform_version compile
   endforeach()
 
   # Set the generic warning
-  set(GENERIC_MESSAGE "Pre-built binaries for the operating system and compiler do not exist! The best possible match will be downloaded; however, problems may occur, especially if the pre-built binaries are compiled with a different compiler.")
+  if (NOT complete_match)
+    set(GENERIC_MESSAGE "Pre-built binaries for the operating system and compiler do not exist! The best possible match will be downloaded; however, problems may occur, especially if the pre-built binaries are compiled with a different compiler.")
+  endif()
 
   # Find what happened in loop!
   if(complete_match)
@@ -1534,3 +1533,92 @@ macro(test_versioning)
   message("Exact test - Output: ${output_dir} should be 9.8/clang/2.2")
 
 endmacro()
+
+
+# PYTHON_ADD_MODULE(<name> src1 src2 ... srcN) is used to build modules for python.
+# PYTHON_WRITE_MODULES_HEADER(<filename>) writes a header file you can include
+# in your sources to initialize the static python modules
+function(PYTHON_ADD_MODULE _NAME )
+  get_property(_TARGET_SUPPORTS_SHARED_LIBS
+    GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS)
+  option(PYTHON_ENABLE_MODULE_${_NAME} "Add module ${_NAME}" TRUE)
+  option(PYTHON_MODULE_${_NAME}_BUILD_SHARED
+    "Add module ${_NAME} shared" ${_TARGET_SUPPORTS_SHARED_LIBS})
+
+  # Mark these options as advanced
+  mark_as_advanced(PYTHON_ENABLE_MODULE_${_NAME}
+    PYTHON_MODULE_${_NAME}_BUILD_SHARED)
+
+  if(PYTHON_ENABLE_MODULE_${_NAME})
+    if(PYTHON_MODULE_${_NAME}_BUILD_SHARED)
+      set(PY_MODULE_TYPE MODULE)
+    else()
+      set(PY_MODULE_TYPE STATIC)
+      set_property(GLOBAL  APPEND  PROPERTY  PY_STATIC_MODULES_LIST ${_NAME})
+    endif()
+
+    set_property(GLOBAL  APPEND  PROPERTY  PY_MODULES_LIST ${_NAME})
+    add_library(${_NAME} ${PY_MODULE_TYPE} ${ARGN})
+#    target_link_libraries(${_NAME} ${PYTHON_LIBRARIES})
+
+    if(PYTHON_MODULE_${_NAME}_BUILD_SHARED)
+      set_target_properties(${_NAME} PROPERTIES PREFIX "${PYTHON_MODULE_PREFIX}")
+      if(WIN32 AND NOT CYGWIN)
+        set_target_properties(${_NAME} PROPERTIES SUFFIX ".pyd")
+      endif()
+    endif()
+
+  endif()
+endfunction()
+
+function(PYTHON_WRITE_MODULES_HEADER _filename)
+
+  get_property(PY_STATIC_MODULES_LIST  GLOBAL  PROPERTY PY_STATIC_MODULES_LIST)
+
+  get_filename_component(_name "${_filename}" NAME)
+  string(REPLACE "." "_" _name "${_name}")
+  string(TOUPPER ${_name} _nameUpper)
+  set(_filename ${CMAKE_CURRENT_BINARY_DIR}/${_filename})
+
+  set(_filenameTmp "${_filename}.in")
+  file(WRITE ${_filenameTmp} "/*Created by cmake, do not edit, changes will be lost*/\n")
+  file(APPEND ${_filenameTmp}
+"#ifndef ${_nameUpper}
+#define ${_nameUpper}
+
+#include <Python.h>
+
+#ifdef __cplusplus
+extern \"C\" {
+#endif /* __cplusplus */
+
+")
+
+  foreach(_currentModule ${PY_STATIC_MODULES_LIST})
+    file(APPEND ${_filenameTmp} "extern void init${PYTHON_MODULE_PREFIX}${_currentModule}(void);\n\n")
+  endforeach()
+
+  file(APPEND ${_filenameTmp}
+"#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+")
+
+
+  foreach(_currentModule ${PY_STATIC_MODULES_LIST})
+    file(APPEND ${_filenameTmp} "int ${_name}_${_currentModule}(void) \n{\n  static char name[]=\"${PYTHON_MODULE_PREFIX}${_currentModule}\"; return PyImport_AppendInittab(name, init${PYTHON_MODULE_PREFIX}${_currentModule});\n}\n\n")
+  endforeach()
+
+  file(APPEND ${_filenameTmp} "void ${_name}_LoadAllPythonModules(void)\n{\n")
+  foreach(_currentModule ${PY_STATIC_MODULES_LIST})
+    file(APPEND ${_filenameTmp} "  ${_name}_${_currentModule}();\n")
+  endforeach()
+  file(APPEND ${_filenameTmp} "}\n\n")
+  file(APPEND ${_filenameTmp} "#ifndef EXCLUDE_LOAD_ALL_FUNCTION\nvoid CMakeLoadAllPythonModules(void)\n{\n  ${_name}_LoadAllPythonModules();\n}\n#endif\n\n#endif\n")
+
+# with configure_file() cmake complains that you may not use a file created using file(WRITE) as input file for configure_file()
+  execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_filenameTmp}" "${_filename}" OUTPUT_QUIET ERROR_QUIET)
+
+endfunction()
+

@@ -1,16 +1,9 @@
-/*=========================================================================
+/* Copyright (c) Stanford University, The Regents of the University of
+ *               California, and others.
  *
- * Copyright (c) 2014-2015 The Regents of the University of California.
  * All Rights Reserved.
  *
- * Copyright (c) 2009-2011 Open Source Medical Software Corporation,
- *                         University of California, San Diego.
- *
- * Portions of the code Copyright (c) 1998-2007 Stanford University,
- * Charles Taylor, Nathan Wilson, Ken Wang.
- *
- * See SimVascular Acknowledgements file for additional
- * contributors to the source code.
+ * See Copyright-SimVascular.txt for additional details.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,15 +16,18 @@
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- *=========================================================================*/
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include "SimVascular.h"
 
@@ -41,6 +37,7 @@
 #include "cv_get_tcl_interp_init.h"
 #include <string.h>
 #include <assert.h>
+#include "Python.h"
 
 // Globals:
 // --------
@@ -68,7 +65,7 @@ cvFactoryRegistrar cvSolidModel::gRegistrar;
 // registered in the repository.  Subsequent cvSolidModel lookup's
 // currently DO NOT check for NULL values.  The idea is that objects
 // are checked for validity *before* they get registered.
-
+#ifdef SV_USE_TCL
 cvSolidModel* cvSolidModel::DefaultInstantiateSolidModel( Tcl_Interp *interp )
 {
   // Get the solid model factory registrar associated with this Tcl interpreter.
@@ -102,7 +99,37 @@ cvSolidModel* cvSolidModel::DefaultInstantiateSolidModel( Tcl_Interp *interp )
   return solid;
 
 }
+#endif
 
+#ifdef SV_USE_PYTHON
+cvSolidModel* cvSolidModel::pyDefaultInstantiateSolidModel()
+{
+  // Get the solid model factory registrar associated with the python interpreter.
+  cvFactoryRegistrar* pySolidModelRegistrar =(cvFactoryRegistrar *) PySys_GetObject("solidModelRegistrar");
+  if (pySolidModelRegistrar==NULL)
+  {
+    fprintf(stdout,"Cannot get solidModelRegistrar from pySys");
+  }
+  cvSolidModel* solid = NULL;
+  if (cvSolidModel::gCurrentKernel == SM_KT_PARASOLID ||
+      cvSolidModel::gCurrentKernel == SM_KT_DISCRETE ||
+      cvSolidModel::gCurrentKernel == SM_KT_POLYDATA ||
+      cvSolidModel::gCurrentKernel == SM_KT_OCCT ||
+      cvSolidModel::gCurrentKernel == SM_KT_MESHSIMSOLID)
+      {
+        solid = (cvSolidModel *) (pySolidModelRegistrar->UseFactoryMethod( cvSolidModel::gCurrentKernel ));
+        if (solid == NULL) {
+		  fprintf( stdout, "Unable to create solid model kernel (%i)\n",cvSolidModel::gCurrentKernel);
+		  //Tcl_SetResult( interp, "Unable to create solid model", TCL_STATIC );
+    }
+  } else {
+    fprintf( stdout, "current kernel is not valid (%i)\n",cvSolidModel::gCurrentKernel);
+    //Tcl_SetResult( interp, "current kernel is not valid", TCL_STATIC );
+  }
+  return solid;
+
+}
+#endif
 // ----------
 // cvSolidModel
 // ----------
