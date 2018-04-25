@@ -92,12 +92,15 @@ set(SV_LIBS ${SV_LIBS}
 
 # vtkSV Libraries
 set(SV_LIBS ${SV_LIBS}
-  VTKSVBOOLEAN
   VTKSVCOMMON
-  VTKSVFILTERS
+  VTKSVIO
+  VTKSVMISC
+  VTKSVBOOLEAN
   VTKSVGEOMETRY
   VTKSVNURBS
-  VTKSVPARAMETERIZATION)
+  VTKSVPARAMETERIZATION
+  VTKSVSEGMENTATION
+  )
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

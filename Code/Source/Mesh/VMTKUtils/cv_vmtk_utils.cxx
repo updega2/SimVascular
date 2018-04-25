@@ -58,7 +58,7 @@
 #include "vtkDataSetSurfaceFilter.h"
 #include "vtkGeometryFilter.h"
 #include "vtkCellArray.h"
-#include "vtkSVFillHolesFilterWithIds.h"
+#include "vtkSVFillHolesWithIdsFilter.h"
 
 #include "vtkvmtkPolyDataSurfaceRemeshing.h"
 #include "vtkvmtkPolyDataSizingFunction.h"
@@ -474,8 +474,8 @@ int sys_geom_cap_with_ids( cvPolyData *polydata,cvPolyData **cappedpolydata,
   try {
 
     std::cout<<"Capping Surface..."<<endl;
-    vtkSmartPointer<vtkSVFillHolesFilterWithIds> capper =
-	    vtkSmartPointer<vtkSVFillHolesFilterWithIds>::New();
+    vtkSmartPointer<vtkSVFillHolesWithIdsFilter> capper =
+	    vtkSmartPointer<vtkSVFillHolesWithIdsFilter>::New();
     capper->SetInputData(geom);
     capper->SetFillId(fillId);
     //Fill type, 0 for number of holes filled, 1 for a fillid, and 2 for

@@ -250,8 +250,8 @@ endif
 
 ifeq ($(CLUSTER), x64_cygwin)
     OPEN_SOFTWARE_BINARIES_TOPLEVEL = C:/cygwin64/usr/local/sv/ext/bin/$(SV_COMPILER)/$(SV_COMPILER_VERSION)/x64/relwithdebinfo
-    OPEN_SOFTWARE_BUILDS_TOPLEVEL   = 
-    OPEN_SOFTWARE_SOURCES_TOPLEVEL  = 
+    OPEN_SOFTWARE_BUILDS_TOPLEVEL   =
+    OPEN_SOFTWARE_SOURCES_TOPLEVEL  =
     LICENSED_SOFTWARE_TOPLEVEL      = C:/cygwin64/usr/local/sv/licensed
 endif
 
@@ -791,10 +791,12 @@ SV_LIB_UTILS_NAME=_simvascular_utils
 SV_LIB_VMTK_UTILS_NAME=_simvascular_vmtk_utils
 SV_LIB_VTKSVBOOLEAN_NAME=_simvascular_vtksvboolean
 SV_LIB_VTKSVCOMMON_NAME=_simvascular_vtksvcommon
-SV_LIB_VTKSVFILTERS_NAME=_simvascular_vtksvfilters
+SV_LIB_VTKSVIO_NAME=_simvascular_vtksvio
+SV_LIB_VTKSVMISC_NAME=_simvascular_vtksvmisc
 SV_LIB_VTKSVGEOMETRY_NAME=_simvascular_vtksvgeometry
 SV_LIB_VTKSVNURBS_NAME=_simvascular_vtksvnurbs
 SV_LIB_VTKSVPARAMETERIZATION_NAME=_simvascular_vtksvparameterization
+SV_LIB_VTKSVSEGMENTATION_NAME=_simvascular_vtksvsegmentation
 
 #plugin names
 SV_PLUGIN_APPLICATION_NAME=org_sv_gui_qt_application

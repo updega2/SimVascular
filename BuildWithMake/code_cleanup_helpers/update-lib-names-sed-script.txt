@@ -32,10 +32,12 @@ s/_simvascular_utils/$(SV_LIB_UTILS_NAME)/g
 s/_simvascular_vmtk_utils/$(SV_LIB_VMTK_UTILS_NAME)/g
 s/_simvascular_vtksvboolean/$(SV_LIB_VTKSVBOOLEAN_NAME)/g
 s/_simvascular_vtksvcommon/$(SV_LIB_VTKSVCOMMON_NAME)/g
-s/_simvascular_vtksvfilters/$(SV_LIB_VTKSVFILTERS_NAME)/g
+s/_simvascular_vtksvio/$(SV_LIB_VTKSVIO_NAME)/g
+s/_simvascular_vtksvmisc/$(SV_LIB_VTKSVMISC_NAME)/g
 s/_simvascular_vtksvgeometry/$(SV_LIB_VTKSVGEOMETRY_NAME)/g
 s/_simvascular_vtksvnurbs/$(SV_LIB_VTKSVNURBS_NAME)/g
 s/_simvascular_vtksvparameterization/$(SV_LIB_VTKSVPARAMETERIZATION_NAME)/g
+s/_simvascular_vtksvsegmentation/$(SV_LIB_VTKSVSEGMENTATION_NAME)/g
 
 
 s/simvascular_adaptor/$(SV_LIB_ADAPTOR_NAME)/g
@@ -72,10 +74,12 @@ s/simvascular_utils/$(SV_LIB_UTILS_NAME)/g
 s/simvascular_vmtk_utils/$(SV_LIB_VMTK_UTILS_NAME)/g
 s/simvascular_vtksvboolean/$(SV_LIB_VTKSVBOOLEAN_NAME)/g
 s/simvascular_vtksvcommon/$(SV_LIB_VTKSVCOMMON_NAME)/g
-s/simvascular_vtksvfilters/$(SV_LIB_VTKSVFILTERS_NAME)/g
+s/simvascular_vtksvio/$(SV_LIB_VTKSVIO_NAME)/g
+s/simvascular_vtksvmisc/$(SV_LIB_VTKSVMISC_NAME)/g
 s/simvascular_vtksvgeometry/$(SV_LIB_VTKSVGEOMETRY_NAME)/g
 s/simvascular_vtksvnurbs/$(SV_LIB_VTKSVNURBS_NAME)/g
 s/simvascular_vtksvparameterization/$(SV_LIB_VTKSVPARAMETERIZATION_NAME)/g
+s/simvascular_vtksvsegmentation/$(SV_LIB_VTKSVSEGMENTATION_NAME)/g
 
 s/org_sv_gui_qt_application/$(SV_PLUGIN_APPLICATION_NAME)/g
 s/org_sv_gui_qt_meshing/$(SV_PLUGIN_MESHING_NAME)/g
