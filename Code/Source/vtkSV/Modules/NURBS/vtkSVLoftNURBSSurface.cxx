@@ -33,18 +33,20 @@
 
 #include "vtkAlgorithmOutput.h"
 #include "vtkCellData.h"
+#include "vtkErrorCode.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkMath.h"
 #include "vtkObjectFactory.h"
-#include "vtkPointData.h"
 #include "vtkPolyData.h"
+#include "vtkPointData.h"
 #include "vtkSmartPointer.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
-#include "vtkSVGlobals.h"
-#include "vtkSVNURBSUtils.h"
-#include "vtkSVMathUtils.h"
 #include "vtkTrivialProducer.h"
+
+#include "vtkSVGlobals.h"
+#include "vtkSVMathUtils.h"
+#include "vtkSVNURBSUtils.h"
 
 #include <string>
 #include <sstream>
@@ -247,10 +249,27 @@ int vtkSVLoftNURBSSurface::RequestData(
     inputs[idx] = vtkPolyData::GetData(inputVector[0],idx);
     }
 
+  if (this->UKnotSpanType == NULL ||
+      this->VKnotSpanType == NULL)
+  {
+    vtkErrorMacro("Need to provide knot span types for u, v directions");
+    this->SetErrorCode(vtkErrorCode::UserError + 1);
+    return SV_ERROR;
+  }
+
+  if (this->UParametricSpanType == NULL ||
+      this->VParametricSpanType == NULL)
+  {
+    vtkErrorMacro("Need to provide parametric span types for u, v directions");
+    this->SetErrorCode(vtkErrorCode::UserError + 2);
+    return SV_ERROR;
+  }
+
   // TODO: Need to make sure knot span and parameteric span types are set
   if (this->LoftNURBS(inputs,numInputs,output) != SV_OK)
   {
     vtkErrorMacro("Could not loft surface");
+    this->SetErrorCode(vtkErrorCode::UserError + 3);
     delete [] inputs;
     return SV_ERROR;
   }
@@ -457,7 +476,7 @@ int vtkSVLoftNURBSSurface::LoftNURBS(vtkPolyData *inputs[], int numInputs,
   vtkNew(vtkDoubleArray, uKnots);
   if (vtkSVNURBSUtils::GetKnots(U, p, kutype, uKnots) != SV_OK)
   {
-    fprintf(stderr,"Error getting knots\n");
+    vtkErrorMacro("Error getting knots");
     return SV_ERROR;
   }
   //fprintf(stdout,"X knots\n");
@@ -476,7 +495,7 @@ int vtkSVLoftNURBSSurface::LoftNURBS(vtkPolyData *inputs[], int numInputs,
   vtkNew(vtkDoubleArray, vKnots);
   if (vtkSVNURBSUtils::GetKnots(V, q, kvtype, vKnots) != SV_OK)
   {
-    fprintf(stderr,"Error getting knots\n");
+    vtkErrorMacro("Error getting knots");
     return SV_ERROR;
   }
   //fprintf(stdout,"Y knots\n");
@@ -500,7 +519,7 @@ int vtkSVLoftNURBSSurface::LoftNURBS(vtkPolyData *inputs[], int numInputs,
     }
   }
 
-  // Get derivatives in fomrat we need
+  // Get derivatives in format we need
   vtkNew(vtkDoubleArray, DV0); DV0->DeepCopy(this->StartVDerivatives);
   vtkNew(vtkDoubleArray, DVN); DVN->DeepCopy(this->EndVDerivatives);
   if (!strncmp(kvtype.c_str(), "derivative", 10))
@@ -547,7 +566,7 @@ int vtkSVLoftNURBSSurface::GetDefaultDerivatives(vtkStructuredGrid *input, const
 
   // Get number of values and derivatives from dim
   int numVals   = dim[comp];
-  int numDerivs = dim[-1*(comp-1)];
+  int numDerivs = dim[(comp+1)%2];
 
   // Set number of tuples for derivatives
   D0out->SetNumberOfTuples(numDerivs);
@@ -555,7 +574,7 @@ int vtkSVLoftNURBSSurface::GetDefaultDerivatives(vtkStructuredGrid *input, const
   for (int i=0; i<numDerivs; i++)
   {
     int pos[3]; pos[2] = 0;
-    pos[-1*(comp-1)] = i;
+    pos[(comp+1)%2] = i;
 
     // Get the point id
     double pt0[3]; pos[comp] = 0;

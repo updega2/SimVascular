@@ -28,11 +28,10 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 /**
  *  \class vtkSVGeneralUtils
- *  \brief This is a class of purely static functions and no member data.
- *  It is essentially a compilation of useful and simple functions to be called
+ *  \brief This is a class of purely static functions.
+ *  It is a compilation of useful and simple functions to be called
  *  anywhere in code base.
  *
  *  \author Adam Updegrove
@@ -55,6 +54,7 @@
 #include "vtkObjectFactory.h"
 #include "vtkPlane.h"
 #include "vtkPolyData.h"
+#include "vtkUnstructuredGrid.h"
 
 #include <string>
 #include <sstream>
@@ -112,6 +112,15 @@ public:
   /** \brief
    *  \param polydata to check. */
   static int CheckSurface(vtkPolyData *pd);
+
+  /** \brief
+   *  \param polydata to check.
+   *  \param numNonTriangleElements returns the number of non-triangle elements.
+   *  \param numNonManifoldEdges returns the number of non-manifold elements.
+   *  \param numOpenEdges returns the number of open edges.
+   *  \param surfaceGenus returns the surface genus. */
+
+  static int CheckSurface(vtkPolyData *pd, int &numNonTriangleCells, int &numNonManifoldEdges, int &numOpenEdges, int &surfaceGenus);
 
   //General operations
   /** \brief Gets region closest to given point.
@@ -173,6 +182,32 @@ public:
   static int ThresholdPd(vtkPolyData *pd, int minVal, int maxVal, int dataType,
                          std::string arrayName, vtkPolyData *returnPd);
 
+  /** \brief Awesome function that is wrapper around vtkThreshold
+   *  \param ug Input ug to threshold, updated in place.
+   *  \param minVal minumum value.
+   *  \param maxVal maximum value.
+   *  \param dataType 0 for point data, 1 for cell data.
+   *  \param arrayName Name of array to be used to threshold ug.
+   *  \return SV_OK */
+  static int ThresholdUg(vtkUnstructuredGrid *ug, int minVal, int maxVal, int dataType,
+                         std::string arrayName);
+
+  /** \brief Awesome function that is wrapper around vtkThreshold
+   *  \param ug Input ug to threshold.
+   *  \param minVal minumum value.
+   *  \param maxVal maximum value.
+   *  \param dataType 0 for point data, 1 for cell data.
+   *  \param arrayName Name of array to be used to threshold ug.
+   *  \param returnPd The resultant thresholded ug
+   *  \return SV_OK */
+  static int ThresholdUg(vtkUnstructuredGrid *ug, int minVal, int maxVal, int dataType,
+                         std::string arrayName, vtkUnstructuredGrid *returnUg);
+
+  /** \brief Get a polydata of the edges of the input polydata. Each edge is
+   *  a VTK_LINE cell..
+   *  \return SV_OK.  */
+  static int GetEdgePolyData(vtkPolyData *pd, vtkPolyData *edgePd);
+
   /** \brief Get centroid of points */
   static int GetCentroidOfPoints(vtkPoints *points, double centroid[3]);
 
@@ -181,10 +216,19 @@ public:
    *  \param pd The full polydata.
    *  \param arrayName Name of array to get cell data of.
    *  \param pointId The point Id to get array values of.
-   *  \param groupIds list of values on cells attached to point.
+   *  \param valList list of values on cells attached to point.
    *  \return SV_OK */
-  static int GetPointCellsValues(vtkPolyData *pd, std::string arrayName,
-                                const int pointId, vtkIdList *valList);
+  static int GetPointCellsValues(vtkPointSet *ps, std::string arrayName,
+                                 const int pointId, vtkIdList *valList);
+
+  /** \brief For an array of integers on pd, will return a list of values on neighboring cells
+   *  \param pd The full polydata.
+   *  \param arrayName Name of array to get cell data of.
+   *  \param cellId The cell Id to get neighbors values of.
+   *  \param valList list of values on cells attached to point.
+   *  \return SV_OK */
+  static int GetNeighborsCellsValues(vtkPolyData *pd, std::string arrayName,
+                                    const int cellId, vtkIdList *valList);
 
   /** \brief Perform a cut of the polydata, but with crinkle clip. Uses vtkExtractGeometry
    *  \param inPd The pd to cut.
@@ -353,7 +397,7 @@ public:
                          vtkPolyData *loop, vtkIdList *boundaryIds);
 
 
-  /** \brief Function separate multiple boundary loops. */
+  /** \brief Function to separate multiple boundary loops. */
   static int SeparateLoops(vtkPolyData *pd, vtkPolyData **loops, int numBoundaries, const double xvec[3], const double zvec[3], const int boundaryStart[2]);
 
   //@{
@@ -365,10 +409,12 @@ public:
   //@}
 
   //@{
-  /** \brief Transforms pd with the given rotation matrix.
+  /** \brief Transforms pd or ug with the given rotation matrix.
    *  return SV_OK */
   static int ApplyRotationMatrix(vtkPolyData *pd, vtkMatrix4x4 *rotMatrix);
   static int ApplyRotationMatrix(vtkPolyData *pd, double rotMatrix[16]);
+  static int ApplyRotationMatrix(vtkUnstructuredGrid *ug, vtkMatrix4x4 *rotMatrix);
+  static int ApplyRotationMatrix(vtkUnstructuredGrid *ug, double rotMatrix[16]);
   //@}
 
   /** \brief Get all angles of a polydata surface.
@@ -376,23 +422,6 @@ public:
    *  It has three components as there are three angles per cell.
    *  return SV_OK */
   static int GetPolyDataAngles(vtkPolyData *pd, vtkFloatArray *cellAngles);
-
-  //@{
-  /** \brief Convenience functions for multimaps. Not sure how long I'll keep
-   *  these.
-   *  return SV_OK */
-  static int GetAllMapKeys(std::multimap<int, int> &map, std::list<int> &list);
-  static int GetAllMapValues(std::multimap<int, int> &map, std::list<int> &list);
-  static int GetValuesFromMap(std::multimap<int, int> &map, const int key, std::list<int> &list);
-  static int GetKeysFromMap(std::multimap<int, int> &map, const int value, std::list<int> &list);
-  static int GetCommonValues(std::multimap<int, int> &map, const int keyA,
-                             const int keyB, std::list<int> &returnList);
-  static int GetUniqueNeighbors(std::multimap<int, int> &map, const int key, std::list<int> &keyVals,
-                                std::list<int> &uniqueKeys);
-  static int ListIntersection(std::list<int> &listA,
-                              std::list<int> &listB,
-                              std::list<int> &returnList);
-  //@}
 
 protected:
   vtkSVGeneralUtils();

@@ -62,6 +62,7 @@
 #include "vtkSVMathUtils.h"
 #include "vtkThreshold.h"
 #include "vtkTransform.h"
+#include "vtkTransformFilter.h"
 #include "vtkTransformPolyDataFilter.h"
 #include "vtkTriangleFilter.h"
 #include "vtkDataSet.h"
@@ -214,11 +215,90 @@ int vtkSVGeneralUtils::CheckArrayExists(vtkDataSet *ds,
 }
 
 // ----------------------
+// GetEdgePolyData
+// ----------------------
+int vtkSVGeneralUtils::GetEdgePolyData(vtkPolyData *pd, vtkPolyData *edgePd)
+{
+  // ------------------------------------------------------------------------
+  // Start edge insertion for edge table
+  int numCells = pd->GetNumberOfCells();
+  int numPts   = pd->GetNumberOfPoints();
+
+  vtkNew(vtkEdgeTable, edgeTable);
+  edgeTable->InitEdgeInsertion(numPts, 1);
+  // ------------------------------------------------------------------------
+
+  // ------------------------------------------------------------------------
+  // Loop through cells
+  vtkNew(vtkIdList, neighborCellIds);
+  int totEdges = 0;
+  for (int i=0; i<numCells; i++)
+  {
+    // Get cellpoints
+    vtkIdType npts, *pts;
+    pd->GetCellPoints(i, npts, pts);
+    for (int j=0; j<npts; j++)
+    {
+      // Get each edge of cell
+      vtkIdType p0 = pts[j];
+      vtkIdType p1 = pts[(j+1)%npts];
+
+      pd->GetCellEdgeNeighbors(i, p0, p1, neighborCellIds);
+      vtkIdType neighborCellId = 0;
+
+      // Check to see if it is a boundary edge
+      if (neighborCellIds->GetNumberOfIds() > 0)
+        neighborCellId = neighborCellIds->GetId(0);
+      else
+      {
+        neighborCellId = -1;
+      }
+
+      // Check to see if edge has already been inserted
+      vtkIdType checkEdge = edgeTable->IsEdge(p0, p1);
+      if (checkEdge == -1)
+      {
+        totEdges++;
+        // Get new edge id and insert into table
+        vtkIdType edgeId = edgeTable->InsertEdge(p0, p1);
+      }
+    }
+  }
+  // ------------------------------------------------------------------------
+
+  // ------------------------------------------------------------------------
+  // Now make polydata from edge table
+  vtkNew(vtkCellArray, edgeCells);
+  vtkNew(vtkIdList, newEdgeCell);
+  edgeTable->InitTraversal();
+  int edgeId = 0;
+  for (edgeId = 0; edgeId < totEdges;  edgeId++)
+  {
+    vtkIdType edgePtId0, edgePtId1;
+    edgeTable->GetNextEdge(edgePtId0, edgePtId1);
+
+    newEdgeCell->Reset();
+    newEdgeCell->SetNumberOfIds(2);
+    newEdgeCell->SetId(0, edgePtId0);
+    newEdgeCell->SetId(1, edgePtId1);
+
+    edgeCells->InsertNextCell(newEdgeCell);
+  }
+  // ------------------------------------------------------------------------
+
+  // ------------------------------------------------------------------------
+  // Set cells and points
+  edgePd->SetLines(edgeCells);
+  edgePd->SetPoints(pd->GetPoints());
+  edgePd->BuildLinks();
+  // ------------------------------------------------------------------------
+
+  return SV_OK;
+}
+
+// ----------------------
 // CheckSurface
 // ----------------------
-/*
- * \details TODO: Want to make more checks
- */
 int vtkSVGeneralUtils::CheckSurface(vtkPolyData *pd)
 {
   pd->BuildLinks();
@@ -251,6 +331,72 @@ int vtkSVGeneralUtils::CheckSurface(vtkPolyData *pd)
       }
     }
   }
+  return SV_OK;
+}
+
+// ----------------------
+// CheckSurface
+// ----------------------
+int vtkSVGeneralUtils::CheckSurface(vtkPolyData *pd,
+                                    int &numNonTriangleCells,
+                                    int &numNonManifoldEdges,
+                                    int &numOpenEdges,
+                                    int &surfaceGenus)
+{
+  pd->BuildLinks();
+
+  int numPts = pd->GetNumberOfPoints();
+  int numPolys = pd->GetNumberOfCells();
+
+  // Start edge insertion for edge table
+  vtkNew(vtkEdgeTable, surfaceEdgeTable);
+  surfaceEdgeTable->InitEdgeInsertion(numPts, 1);
+
+  numOpenEdges        = 0;
+  numNonTriangleCells = 0;
+  numNonManifoldEdges = 0;
+  for (int i=0; i<numPolys; i++)
+  {
+    vtkIdType npts, *pts;
+    pd->GetCellPoints(i, npts, pts);
+    if (npts != 3)
+    {
+      numNonTriangleCells++;
+    }
+    for (int j=0; j<npts; j++)
+    {
+      vtkIdType p0, p1;
+      p0 = pts[j];
+      p1 = pts[(j+1)%npts];
+
+      vtkNew(vtkIdList, edgeNeighbor);
+      pd->GetCellEdgeNeighbors(i, p0, p1, edgeNeighbor);
+
+      if (edgeNeighbor->GetNumberOfIds() == 0)
+      {
+        numOpenEdges++;
+      }
+      if (edgeNeighbor->GetNumberOfIds() > 1)
+      {
+        numNonManifoldEdges++;
+      }
+
+      // Check to see if edge has already been inserted
+      vtkIdType checkEdge = surfaceEdgeTable->IsEdge(p0, p1);
+      if (checkEdge == -1)
+      {
+        // Get new edge id and insert into table
+        vtkIdType edgeId = surfaceEdgeTable->InsertEdge(p0, p1);
+      }
+    }
+  }
+
+  int ne = surfaceEdgeTable->GetNumberOfEdges();
+  int nv = numPts;
+  int nf = numPolys;
+
+  surfaceGenus = ((ne - nv - nf)/2) + 1;
+
   return SV_OK;
 }
 
@@ -325,7 +471,7 @@ int vtkSVGeneralUtils::GiveIds(vtkPolyData *inPd,
 }
 
 // ----------------------
-// GiveIds
+// IteratePoint
 // ----------------------
 int vtkSVGeneralUtils::IteratePoint(vtkPolyData *pd, int &pointId, int &prevCellId)
 {
@@ -404,6 +550,45 @@ int vtkSVGeneralUtils::ThresholdPd(vtkPolyData *pd, int minVal,
                                         arrayName);
 }
 
+// ----------------------
+// ThresholdUg
+// ----------------------
+int vtkSVGeneralUtils::ThresholdUg(vtkUnstructuredGrid *ug, int minVal,
+                                   int maxVal, int dataType,
+                                   std::string arrayName)
+{
+  // Set up threshold filter
+  vtkNew(vtkThreshold, thresholder);
+  thresholder->SetInputData(ug);
+  //Set Input Array to 0 port,0 connection, dataType (0 - point, 1 - cell, and Regions is the type name
+  thresholder->SetInputArrayToProcess(0, 0, 0, dataType, arrayName.c_str());
+  thresholder->ThresholdBetween(minVal, maxVal);
+  thresholder->Update();
+
+  // Check to see if the result has points, don't run surface filter
+  if (thresholder->GetOutput()->GetNumberOfPoints() == 0)
+    return SV_ERROR;
+
+  // Set the final ug
+  ug->DeepCopy(thresholder->GetOutput());
+
+  return SV_OK;
+}
+
+// ----------------------
+// ThresholdUg
+// ----------------------
+int vtkSVGeneralUtils::ThresholdUg(vtkUnstructuredGrid *ug, int minVal,
+                                   int maxVal, int dataType,
+                                   std::string arrayName,
+                                   vtkUnstructuredGrid *returnUg)
+{
+  // Simple, call the other implementation
+  returnUg->DeepCopy(ug);
+  return vtkSVGeneralUtils::ThresholdUg(returnUg, minVal, maxVal, dataType,
+                                        arrayName);
+}
+
 
 // ----------------------
 // GetCentroidOfPoints
@@ -438,26 +623,66 @@ int vtkSVGeneralUtils::GetCentroidOfPoints(vtkPoints *points,
 // GetPointCellsValues
 // ----------------------
 /** \details The value is not added to the list of values if it is -1 */
-int vtkSVGeneralUtils::GetPointCellsValues(vtkPolyData *pd, std::string arrayName,
+int vtkSVGeneralUtils::GetPointCellsValues(vtkPointSet *ps, std::string arrayName,
                                            const int pointId, vtkIdList *valList)
+{
+  // Get data from pd
+  vtkDataArray *valArray =
+    ps->GetCellData()->GetArray(arrayName.c_str());
+  valList->Reset();
+
+  // Get point cells
+  vtkNew(vtkIdList, cellIds);
+  ps->GetPointCells(pointId, cellIds);
+
+  // Loop through and check each point
+  for (int i=0; i<cellIds->GetNumberOfIds(); i++)
+  {
+    int value = valArray->GetTuple1(cellIds->GetId(i));
+
+    // Only adding to list if value is not -1
+    if (valList->IsId(value) == -1)
+      valList->InsertNextId(value);
+  }
+
+  return SV_OK;
+}
+
+// ----------------------
+// GetNeighborCellsValues
+// ----------------------
+/** \details The value is not added to the list of values if it is -1 */
+int vtkSVGeneralUtils::GetNeighborsCellsValues(vtkPolyData *pd, std::string arrayName,
+                                               const int cellId, vtkIdList *valList)
 {
   // Get data from pd
   vtkDataArray *valArray =
     pd->GetCellData()->GetArray(arrayName.c_str());
   valList->Reset();
 
-  // Get point cells
-  vtkNew(vtkIdList, cellIds);
-  pd->GetPointCells(pointId, cellIds);
+  // Get cell points
+  vtkIdType npts, *pts;
+  pd->GetCellPoints(cellId, npts, pts);
 
-  // Loop through and check each point
-  for (int i=0; i<cellIds->GetNumberOfIds(); i++)
+  // Loop through points
+  for (int i=0; i<npts; i++)
   {
-    int groupValue = valArray->GetTuple1(cellIds->GetId(i));
+    int ptId0 = pts[i];
+    int ptId1 = pts[(i+1)%npts];
 
-    // Only adding to list if value is not -1
-    if (valList->IsId(groupValue) == -1)
-      valList->InsertNextId(groupValue);
+    vtkNew(vtkIdList, cellEdgeNeighbors);
+    pd->GetCellEdgeNeighbors(cellId, ptId0, ptId1, cellEdgeNeighbors);
+
+    // Loop through and check each point
+    for (int j=0; j<cellEdgeNeighbors->GetNumberOfIds(); j++)
+    {
+      int value = valArray->GetTuple1(cellEdgeNeighbors->GetId(j));
+
+      // Only adding to list if value is not -1
+      if (valList->IsId(value) == -1)
+        valList->InsertNextId(value);
+    }
+
   }
 
   return SV_OK;
@@ -821,7 +1046,8 @@ int vtkSVGeneralUtils::CreateEdgeTable(vtkPolyData *pd,
 
         // Insert edge weights and neighboring cells`
         edgeWeights->InsertValue(edgeId, weight);
-        edgeNeighbors->InsertValue(edgeId, neighborCellId);
+        edgeNeighbors->InsertComponent(edgeId, 0, i);
+        edgeNeighbors->InsertComponent(edgeId, 1, neighborCellId);
         if (weight < 0)
         {
           //vtkWarningMacro("Negative weight on edge between cells " << i <<
@@ -1355,6 +1581,53 @@ int vtkSVGeneralUtils::ApplyRotationMatrix(vtkPolyData *pd, vtkMatrix4x4 *rotMat
 // ----------------------
 // ApplyRotationMatrix
 // ----------------------
+int vtkSVGeneralUtils::ApplyRotationMatrix(vtkUnstructuredGrid *ug, double rotMatrix[16])
+{
+  // Set up transformer
+  vtkSmartPointer<vtkTransform> transformer =
+    vtkSmartPointer<vtkTransform>::New();
+  transformer->SetMatrix(rotMatrix);
+
+  // Transform the polydata
+  vtkSmartPointer<vtkTransformFilter> ugTransformer =
+    vtkSmartPointer<vtkTransformFilter>::New();
+  ugTransformer->SetInputData(ug);
+  ugTransformer->SetTransform(transformer);
+  ugTransformer->Update();
+
+  // Copy output
+  ug->DeepCopy(ugTransformer->GetOutput());
+  ug->BuildLinks();
+  return SV_OK;
+}
+
+// ----------------------
+// ApplyRotationMatrix
+// ----------------------
+int vtkSVGeneralUtils::ApplyRotationMatrix(vtkUnstructuredGrid *ug, vtkMatrix4x4 *rotMatrix)
+{
+  // Set up transformer
+  vtkSmartPointer<vtkTransform> transformer =
+    vtkSmartPointer<vtkTransform>::New();
+  transformer->SetMatrix(rotMatrix);
+
+  // Transform the polydata
+  vtkSmartPointer<vtkTransformFilter> ugTransformer =
+    vtkSmartPointer<vtkTransformFilter>::New();
+  ugTransformer->SetInputData(ug);
+  ugTransformer->SetTransform(transformer);
+  ugTransformer->Update();
+
+  // Copy output
+  ug->DeepCopy(ugTransformer->GetOutput());
+  ug->BuildLinks();
+
+  return SV_OK;
+}
+
+// ----------------------
+// ApplyRotationMatrix
+// ----------------------
 int vtkSVGeneralUtils::ApplyRotationMatrix(vtkPolyData *pd, double rotMatrix[16])
 {
   // Set up transformer
@@ -1424,137 +1697,6 @@ int vtkSVGeneralUtils::GetPolyDataAngles(vtkPolyData *pd, vtkFloatArray *cellAng
       cellAngles->SetComponent(i, j, radAngle);
     }
   }
-
-  return SV_OK;
-}
-
-// ----------------------
-// GetAllMapKeys
-// ----------------------
-int vtkSVGeneralUtils::GetAllMapKeys(std::multimap<int, int> &map,
-                                     std::list<int> &list)
-{
-  std::multimap<int, int>::iterator it = map.begin();
-
-  for (int i=0; it != map.end(); ++it)
-  {
-    list.push_back(it->first);
-  }
-  list.unique();
-
-  return SV_OK;
-}
-
-// ----------------------
-// GetAllMapValues
-// ----------------------
-int vtkSVGeneralUtils::GetAllMapValues(std::multimap<int, int> &map,
-                                       std::list<int> &list)
-{
-  std::multimap<int, int>::iterator it = map.begin();
-
-  for (int i=0; it != map.end(); ++it)
-  {
-    list.push_back(it->second);
-  }
-  list.unique();
-
-  return SV_OK;
-}
-
-// ----------------------
-// GetValuesFromMap
-// ----------------------
-int vtkSVGeneralUtils::GetValuesFromMap(std::multimap<int, int> &map,
-                                        const int key,
-                                        std::list<int> &list)
-{
-  std::multimap<int, int>::iterator it = map.begin();
-
-  for (int i=0; it != map.end(); ++it)
-  {
-    if (it->first == key)
-    {
-      list.push_back(it->second);
-    }
-  }
-  return SV_OK;
-}
-
-// ----------------------
-// GetKeysFromMap
-// ----------------------
-int vtkSVGeneralUtils::GetKeysFromMap(std::multimap<int, int> &map,
-                                                  const int value,
-                                                  std::list<int> &list)
-{
-  std::multimap<int, int>::iterator it = map.begin();
-
-  for (int i=0; it != map.end(); ++it)
-  {
-    if (it->second == value)
-    {
-      list.push_back(it->first);
-    }
-  }
-  return SV_OK;
-}
-
-// ----------------------
-// GetCommonValues
-// ----------------------
-int vtkSVGeneralUtils::GetCommonValues(std::multimap<int, int> &map,
-                                                   const int keyA, const int keyB,
-                                                   std::list<int> &returnList)
-{
-  std::list<int> listA, listB;
-  vtkSVGeneralUtils::GetValuesFromMap(map, keyA, listA);
-  vtkSVGeneralUtils::GetValuesFromMap(map, keyB, listB);
-  vtkSVGeneralUtils::ListIntersection(listA, listB, returnList);
-
-  return SV_OK;
-}
-
-// ----------------------
-// GetUniqueNeighbors
-// ----------------------
-int vtkSVGeneralUtils::GetUniqueNeighbors(std::multimap<int, int> &map,
-                                          const int key,
-                                          std::list<int> &keyVals,
-                                          std::list<int> &uniqueKeys)
-{
-  int numVals = keyVals.size();
-
-  std::list<int>::iterator valit = keyVals.begin();
-  for (int i=0; valit != keyVals.end(); ++valit)
-  {
-    std::list<int> valKeys;
-    vtkSVGeneralUtils::GetKeysFromMap(map, *valit, valKeys);
-    std::list<int>::iterator keyit = valKeys.begin();
-    for (int j=0; keyit != valKeys.end(); ++keyit)
-    {
-      if (*keyit != key)
-      {
-        uniqueKeys.push_back(*keyit);
-      }
-    }
-  }
-  uniqueKeys.sort();
-  uniqueKeys.unique();
-
-  return SV_OK;
-}
-
-// ----------------------
-// ListIntersection
-// ----------------------
-int vtkSVGeneralUtils::ListIntersection(std::list<int> &listA,
-                                                    std::list<int> &listB,
-                                                    std::list<int> &returnList)
-{
-  std::set_intersection(listA.begin(), listA.end(),
-                        listB.begin(), listB.end(),
-                        std::inserter(returnList,returnList.begin()));
 
   return SV_OK;
 }
