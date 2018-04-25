@@ -180,8 +180,9 @@ void sv4guiModelExtractPathsAction::WorkThread::run()
         for (int i=0; i<this->mm_SourceCapIds.size(); i++)
           sourceCapIds->InsertNextId(this->mm_SourceCapIds[i]);
 
-        vtkSmartPointer<vtkPolyData> centerlinesPd = sv4guiModelUtils::CreateCenterlines(modelElement, sourceCapIds);
-        vtkSmartPointer<vtkPolyData> mergedCenterlinesPD = sv4guiModelUtils::MergeCenterlines(centerlinesPd);
+        int useVmtk = 0;
+        vtkSmartPointer<vtkPolyData> centerlinesPd = sv4guiModelUtils::CreateCenterlines(modelElement, sourceCapIds, useVmtk);
+        vtkSmartPointer<vtkPolyData> mergedCenterlinesPD = sv4guiModelUtils::MergeCenterlines(centerlinesPd, useVmtk);
 
         std::vector<sv4guiPathElement*> pathElements=sv4guiModelUtils::CreatePathElements(modelElement, mergedCenterlinesPD);
 

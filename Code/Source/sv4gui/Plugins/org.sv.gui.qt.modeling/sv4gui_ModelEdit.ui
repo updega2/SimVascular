@@ -328,15 +328,15 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                       <string/>
                      </property>
                      <property name="currentIndex">
-                      <number>4</number>
+                      <number>5</number>
                      </property>
                      <widget class="QWidget" name="page_2">
                       <property name="geometry">
                        <rect>
                         <x>0</x>
                         <y>0</y>
-                        <width>142</width>
-                        <height>224</height>
+                        <width>159</width>
+                        <height>430</height>
                        </rect>
                       </property>
                       <attribute name="label">
@@ -431,8 +431,8 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                               <rect>
                                <x>0</x>
                                <y>0</y>
-                               <width>126</width>
-                               <height>107</height>
+                               <width>145</width>
+                               <height>283</height>
                               </rect>
                              </property>
                              <property name="sizePolicy">
@@ -648,8 +648,8 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                        <rect>
                         <x>0</x>
                         <y>0</y>
-                        <width>153</width>
-                        <height>353</height>
+                        <width>159</width>
+                        <height>430</height>
                        </rect>
                       </property>
                       <attribute name="label">
@@ -867,7 +867,7 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                            <rect>
                             <x>0</x>
                             <y>0</y>
-                            <width>98</width>
+                            <width>100</width>
                             <height>135</height>
                            </rect>
                           </property>
@@ -981,8 +981,8 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                            <rect>
                             <x>0</x>
                             <y>0</y>
-                            <width>104</width>
-                            <height>85</height>
+                            <width>147</width>
+                            <height>154</height>
                            </rect>
                           </property>
                           <attribute name="label">
@@ -1051,7 +1051,7 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                            <rect>
                             <x>0</x>
                             <y>0</y>
-                            <width>98</width>
+                            <width>100</width>
                             <height>135</height>
                            </rect>
                           </property>
@@ -1224,8 +1224,8 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                        <rect>
                         <x>0</x>
                         <y>0</y>
-                        <width>115</width>
-                        <height>294</height>
+                        <width>159</width>
+                        <height>430</height>
                        </rect>
                       </property>
                       <attribute name="label">
@@ -1277,8 +1277,8 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                            <rect>
                             <x>0</x>
                             <y>0</y>
-                            <width>138</width>
-                            <height>85</height>
+                            <width>148</width>
+                            <height>213</height>
                            </rect>
                           </property>
                           <attribute name="label">
@@ -1693,7 +1693,7 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                         <x>0</x>
                         <y>0</y>
                         <width>159</width>
-                        <height>464</height>
+                        <height>430</height>
                        </rect>
                       </property>
                       <attribute name="label">
@@ -1747,7 +1747,7 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                                <x>0</x>
                                <y>0</y>
                                <width>157</width>
-                               <height>396</height>
+                               <height>362</height>
                               </rect>
                              </property>
                              <attribute name="label">
@@ -1931,7 +1931,7 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                         <x>0</x>
                         <y>0</y>
                         <width>159</width>
-                        <height>464</height>
+                        <height>430</height>
                        </rect>
                       </property>
                       <attribute name="label">
@@ -1972,6 +1972,33 @@ Press key &quot;Delete&quot; to delete all the selected faces and cells.</string
                           <size>
                            <width>20</width>
                            <height>40</height>
+                          </size>
+                         </property>
+                        </spacer>
+                       </item>
+                      </layout>
+                     </widget>
+                     <widget class="QWidget" name="page_6">
+                      <attribute name="label">
+                       <string>Advanced</string>
+                      </attribute>
+                      <layout class="QVBoxLayout" name="verticalLayout_5">
+                       <item>
+                        <widget class="QPushButton" name="btnRunDecomp">
+                         <property name="text">
+                          <string>Run Decomp</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item>
+                        <spacer name="verticalSpacer_17">
+                         <property name="orientation">
+                          <enum>Qt::Vertical</enum>
+                         </property>
+                         <property name="sizeHint" stdset="0">
+                          <size>
+                           <width>20</width>
+                           <height>369</height>
                           </size>
                          </property>
                         </spacer>

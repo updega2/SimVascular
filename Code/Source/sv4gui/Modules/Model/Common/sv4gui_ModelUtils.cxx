@@ -628,7 +628,7 @@ vtkPolyData* sv4guiModelUtils::FillHolesWithIDs(vtkPolyData* inpd, int fillID, i
     cvPolyData* cvpd=new cvPolyData(inpd);
     int numFilled=0;
     cvPolyData* tmpcvpd;
-    if(sys_geom_cap_with_ids(cvpd,&tmpcvpd,fillID,numFilled,fillType)!=SV_OK)
+    if(VMTKUtils_CapWithIds(cvpd,&tmpcvpd,fillID,numFilled,fillType)!=SV_OK)
         return NULL;
 
     if(tmpcvpd==NULL)
@@ -965,7 +965,7 @@ bool sv4guiModelUtils::DeleteRegions(vtkSmartPointer<vtkPolyData> inpd, std::vec
 }
 
 vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElement,
-                                             vtkIdList *sourceCapIds)
+                                             vtkIdList *sourceCapIds, int useVmtk)
 {
     if(modelElement==NULL || modelElement->GetWholeVtkPolyData()==NULL)
         return NULL;
@@ -989,7 +989,7 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElemen
     cleaned = sys_geom_Clean(src);
     delete src;
 
-    if ( sys_geom_cap(cleaned, &capped, &numCapCenterIds, &capCenterIds, 1 ) != SV_OK)
+    if ( VMTKUtils_Cap(cleaned, &capped, &numCapCenterIds, &capCenterIds, 1 ) != SV_OK)
     {
       delete cleaned;
       if (capped != NULL)
@@ -1056,13 +1056,14 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElemen
     delete [] capCenterIds;
 
     vtkPolyData* centerlines=CreateCenterlines(capped->GetVtkPolyData(),
-                                               sourcePtIds, targetPtIds);
+                                               sourcePtIds, targetPtIds,
+                                               useVmtk);
     delete capped;
 
     return centerlines;
 }
 
-vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd)
+vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd, int useVmtk)
 {
   // If given just a polydata, assume it is a wall, cap and get source and
   // target points and then send to centerline extraction
@@ -1076,7 +1077,7 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd)
 
   cleaned = sys_geom_Clean(src);
 
-  if ( sys_geom_cap(cleaned, &capped, &numCapCenterIds, &capCenterIds, 1 ) != SV_OK)
+  if ( VMTKUtils_Cap(cleaned, &capped, &numCapCenterIds, &capCenterIds, 1 ) != SV_OK)
   {
     delete cleaned;
     if (capped != NULL)
@@ -1101,14 +1102,15 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd)
   delete [] capCenterIds;
   // capped and got ids
 
-  return CreateCenterlines(capped->GetVtkPolyData(), sourcePtIds, targetPtIds);
+  return CreateCenterlines(capped->GetVtkPolyData(), sourcePtIds, targetPtIds, useVmtk);
 
 }
 
 
 vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd,
                                              vtkIdList *sourcePtIds,
-                                             vtkIdList *targetPtIds)
+                                             vtkIdList *targetPtIds,
+                                             int useVmtk)
 {
     if(inpd==NULL)
         return NULL;
@@ -1127,7 +1129,7 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd,
     for (int i=0; i<numTargetPts; i++)
       targets[i]=targetPtIds->GetId(i);
 
-    if ( sys_geom_centerlines(src, sources, numSourcePts, targets, numTargetPts, &tempCenterlines, &voronoi) != SV_OK )
+    if ( VMTKUtils_Centerlines(src, sources, numSourcePts, targets, numTargetPts, useVmtk, &tempCenterlines, &voronoi) != SV_OK )
     {
         delete src;
         delete [] sources;
@@ -1140,7 +1142,7 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd,
     delete [] targets;
 
     cvPolyData *centerlines=NULL;
-    if ( sys_geom_separatecenterlines(tempCenterlines, &centerlines) != SV_OK )
+    if ( VMTKUtils_SeparateCenterlines(tempCenterlines, &centerlines) != SV_OK )
     {
         delete tempCenterlines;
         return NULL;
@@ -1150,7 +1152,7 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd,
     return centerlines->GetVtkPolyData();
 }
 
-vtkPolyData* sv4guiModelUtils::MergeCenterlines(vtkPolyData* centerlinesPD)
+vtkPolyData* sv4guiModelUtils::MergeCenterlines(vtkPolyData* centerlinesPD, int useVmtk)
 {
     if(centerlinesPD==NULL)
         return NULL;
@@ -1159,7 +1161,7 @@ vtkPolyData* sv4guiModelUtils::MergeCenterlines(vtkPolyData* centerlinesPD)
 
     cvPolyData *merged_centerlines=NULL;
     int mergeblanked = 1;
-    if (sys_geom_mergecenterlines(centerlines, mergeblanked, &merged_centerlines) != SV_OK )
+    if (VMTKUtils_MergeCenterlines(centerlines, mergeblanked, useVmtk, &merged_centerlines) != SV_OK )
     {
       delete centerlines;
       return NULL;
@@ -1177,7 +1179,7 @@ vtkPolyData* sv4guiModelUtils::CalculateDistanceToCenterlines(vtkPolyData* cente
     cvPolyData *src=new cvPolyData(original);
     cvPolyData *lines=new cvPolyData(centerlines);
     cvPolyData *distance = NULL;
-    if ( sys_geom_distancetocenterlines(src, lines, &distance) != SV_OK )
+    if ( VMTKUtils_DistanceToCenterlines(src, lines, &distance) != SV_OK )
     {
         return NULL;
     }

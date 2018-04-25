@@ -170,7 +170,8 @@ bool sv4guiMeshTetGen::Execute(std::string flag, double values[20], std::string 
             msg="No mesher model";
             return false;
         }
-        vtkPolyData* centerlines=sv4guiModelUtils::CreateCenterlines(solid->GetVtkPolyData());
+        int useVmtkCenterlines = 1;
+        vtkPolyData* centerlines=sv4guiModelUtils::CreateCenterlines(solid->GetVtkPolyData(), useVmtkCenterlines);
         vtkPolyData* distance=sv4guiModelUtils::CalculateDistanceToCenterlines(centerlines, solid->GetVtkPolyData());
         if(distance==NULL)
         {

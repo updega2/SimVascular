@@ -94,15 +94,16 @@ public:
 
     static bool DeleteRegions(vtkSmartPointer<vtkPolyData> inpd, std::vector<int> regionIDs);
 
-    static vtkPolyData* CreateCenterlines(sv4guiModelElement* modelElement, vtkIdList *sourceCapIds = NULL);
+    static vtkPolyData* CreateCenterlines(sv4guiModelElement* modelElement, vtkIdList *sourceCapIds = NULL, int useVmtk=0);
 
-    static vtkPolyData* CreateCenterlines(vtkPolyData* inpd);
+    static vtkPolyData* CreateCenterlines(vtkPolyData* inpd, int useVmtk);
 
     static vtkPolyData* CreateCenterlines(vtkPolyData* inpd,
                                           vtkIdList *sourcePtIds,
-                                          vtkIdList *targetPtIds);
+                                          vtkIdList *targetPtIds,
+                                          int useVmtk);
 
-    static vtkPolyData* MergeCenterlines(vtkPolyData* centerlinesPD);
+    static vtkPolyData* MergeCenterlines(vtkPolyData* centerlinesPD, int useVmtk);
 
     static vtkPolyData* CalculateDistanceToCenterlines(vtkPolyData* centerlines, vtkPolyData* original);
 

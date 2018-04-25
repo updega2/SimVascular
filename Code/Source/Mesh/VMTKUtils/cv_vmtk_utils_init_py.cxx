@@ -142,13 +142,14 @@ PyObject* Geom_CenterlinesCmd( PyObject* self, PyObject* args)
   cvRepositoryData *linesDst = NULL;
   cvRepositoryData *voronoiDst = NULL;
   RepositoryDataT type;
+  int useVmtk = 1;
 
-  if (!PyArg_ParseTuple(args,"sOOss",&geomName,&sourceList,&targetList,
-	&linesName, &voronoiName))
+  if (!PyArg_ParseTuple(args,"sOOssi",&geomName,&sourceList,&targetList,
+	&linesName, &voronoiName, &useVmtk))
   {
     PyErr_SetString(PyRunTimeErr,
-	"Could not import three chars and two list, geomName, sourceList,"
-	"targetList, linesName, voronoiName");
+	"Could not import three chars, two list,and one int, geomName, sourceList,"
+	"targetList, linesName, voronoiName, useVmtk");
     return Py_ERROR;
   }
 
@@ -196,7 +197,7 @@ PyObject* Geom_CenterlinesCmd( PyObject* self, PyObject* args)
   }
   // Do work of command:
 
-  if ( sys_geom_centerlines( (cvPolyData*)geomSrc, sources, nsources, targets, ntargets, (cvPolyData**)(&linesDst), (cvPolyData**)(&voronoiDst))
+  if ( VMTKUtils_Centerlines( (cvPolyData*)geomSrc, sources, nsources, targets, ntargets, useVmtk, (cvPolyData**)(&linesDst), (cvPolyData**)(&voronoiDst))
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr,"error creating centerlines");
     return Py_ERROR;
@@ -272,7 +273,7 @@ PyObject* Geom_GroupPolyDataCmd( PyObject* self, PyObject* args)
 
   // Do work of command:
 
-  if ( sys_geom_grouppolydata( (cvPolyData*)geomSrc, (cvPolyData*)linesSrc, (cvPolyData**)(&groupedDst) )
+  if ( VMTKUtils_GroupPolyData( (cvPolyData*)geomSrc, (cvPolyData*)linesSrc, (cvPolyData**)(&groupedDst) )
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr, "error getting grouped polydata" );
     return Py_ERROR;
@@ -334,7 +335,7 @@ PyObject* Geom_DistanceToCenterlinesCmd( PyObject* self, PyObject* args)
 
   // Do work of command:
 
-  if ( sys_geom_distancetocenterlines( (cvPolyData*)geomSrc, (cvPolyData*)linesSrc, (cvPolyData**)(&distanceDst) )
+  if ( VMTKUtils_DistanceToCenterlines( (cvPolyData*)geomSrc, (cvPolyData*)linesSrc, (cvPolyData**)(&distanceDst) )
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr, "error getting distance to centerlines" );
     return Py_ERROR;
@@ -380,7 +381,7 @@ PyObject* Geom_SeparateCenterlinesCmd( PyObject* self, PyObject* args)
 
   // Do work of command:
 
-  if ( sys_geom_separatecenterlines( (cvPolyData*)linesSrc, (cvPolyData**)(&separateDst) )
+  if ( VMTKUtils_SeparateCenterlines( (cvPolyData*)linesSrc, (cvPolyData**)(&separateDst) )
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr, "error grouping centerlines" );
     return Py_ERROR;
@@ -401,15 +402,16 @@ PyObject* Geom_MergeCenterlinesCmd( PyObject* self, PyObject* args)
   char *linesName;
   char *mergeName;
   int mergeblanked = 1;
+  int useVmtk = 1;
   cvRepositoryData *linesSrc;
   cvRepositoryData *mergeDst = NULL;
   RepositoryDataT type;
 
-  if (!PyArg_ParseTuple(args,"ssi",&linesName,
-	&mergeName, &mergeblanked))
+  if (!PyArg_ParseTuple(args,"ssii",&linesName,
+	&mergeName, &mergeblanked, &useVmtk))
   {
     PyErr_SetString(PyRunTimeErr,
-	"Could not import two chars and one int, linesName,mergeName, mergeblanked");
+	"Could not import two chars and two int, linesName,mergeName, mergeblanked, useVmtk");
     return Py_ERROR;
   }
   // Retrieve source object:
@@ -427,7 +429,7 @@ PyObject* Geom_MergeCenterlinesCmd( PyObject* self, PyObject* args)
 
   // Do work of command:
 
-  if ( sys_geom_mergecenterlines( (cvPolyData*)linesSrc, mergeblanked, (cvPolyData**)(&mergeDst) )
+  if ( VMTKUtils_MergeCenterlines( (cvPolyData*)linesSrc, mergeblanked, useVmtk, (cvPolyData**)(&mergeDst) )
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr, "error merging centerlines" );
     return Py_ERROR;
@@ -485,7 +487,7 @@ PyObject* Geom_CapCmd( PyObject* self, PyObject* args)
 
   // Do work of command:
 
-  if ( sys_geom_cap( (cvPolyData*)geomSrc, (cvPolyData**)(&cappedDst), &numIds,&ids,captype )
+  if ( VMTKUtils_Cap( (cvPolyData*)geomSrc, (cvPolyData**)(&cappedDst), &numIds,&ids,captype )
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr,"error capping model" );
     return Py_ERROR;
@@ -555,7 +557,7 @@ PyObject* Geom_CapWIdsCmd( PyObject* self, PyObject* args)
 
   // Do work of command:
 
-  if ( sys_geom_cap_with_ids( (cvPolyData*)geomSrc, (cvPolyData**)(&cappedDst)
+  if ( VMTKUtils_CapWithIds( (cvPolyData*)geomSrc, (cvPolyData**)(&cappedDst)
 	,fillId,num_filled,filltype)
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr, "error capping model" );
@@ -630,7 +632,7 @@ PyObject* Geom_MapAndCorrectIdsCmd( PyObject* self, PyObject* args)
 
   // Do work of command:
 
-  if ( sys_geom_mapandcorrectids( (cvPolyData*)geomSrc, (cvPolyData*)geomNew, (cvPolyData**)(&geomDst), originalArray,newArray )
+  if ( VMTKUtils_MapAndCorrectIds( (cvPolyData*)geomSrc, (cvPolyData*)geomNew, (cvPolyData**)(&geomDst), originalArray,newArray )
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr, "error correcting ids" );
     return Py_ERROR;

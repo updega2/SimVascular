@@ -127,14 +127,16 @@ int Geom_CenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   cvRepositoryData *linesDst = NULL;
   cvRepositoryData *voronoiDst = NULL;
   RepositoryDataT type;
+  int useVmtk = 1;
 
-  int table_size = 5;
+  int table_size = 6;
   ARG_Entry arg_table[] = {
     { "-src", STRING_Type, &geomName, NULL, REQUIRED, 0, { 0 } },
     { "-sourcelist", LIST_Type, &sourceList, NULL, REQUIRED, 0, { 0 } },
     { "-targetlist", LIST_Type, &targetList, NULL, REQUIRED, 0, { 0 } },
     { "-linesresult", STRING_Type, &linesName, NULL, REQUIRED, 0, { 0 } },
     { "-voronoiresult", STRING_Type, &voronoiName, NULL, REQUIRED, 0, { 0 } },
+    { "-usevmtk", INT_Type, &useVmtk, NULL, SV_OPTIONAL, 0, { 0 } },
   };
   usage = ARG_GenSyntaxStr( 1, argv, table_size, arg_table );
   if ( argc == 1 ) {
@@ -207,7 +209,7 @@ int Geom_CenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( sys_geom_centerlines( (cvPolyData*)geomSrc, sources, nsources, targets, ntargets, (cvPolyData**)(&linesDst), (cvPolyData**)(&voronoiDst))
+  if ( VMTKUtils_Centerlines( (cvPolyData*)geomSrc, sources, nsources, targets, ntargets, useVmtk, (cvPolyData**)(&linesDst), (cvPolyData**)(&voronoiDst))
        != SV_OK ) {
     Tcl_SetResult( interp, "error creating centerlines", TCL_STATIC );
     return TCL_ERROR;
@@ -299,7 +301,7 @@ int Geom_GroupPolyDataCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( sys_geom_grouppolydata( (cvPolyData*)geomSrc, (cvPolyData*)linesSrc, (cvPolyData**)(&groupedDst) )
+  if ( VMTKUtils_GroupPolyData( (cvPolyData*)geomSrc, (cvPolyData*)linesSrc, (cvPolyData**)(&groupedDst) )
        != SV_OK ) {
     Tcl_SetResult( interp, "error getting grouped polydata", TCL_STATIC );
     return TCL_ERROR;
@@ -379,7 +381,7 @@ int Geom_DistanceToCenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( sys_geom_distancetocenterlines( (cvPolyData*)geomSrc, (cvPolyData*)linesSrc, (cvPolyData**)(&distanceDst) )
+  if ( VMTKUtils_DistanceToCenterlines( (cvPolyData*)geomSrc, (cvPolyData*)linesSrc, (cvPolyData**)(&distanceDst) )
        != SV_OK ) {
     Tcl_SetResult( interp, "error getting distance to centerlines", TCL_STATIC );
     return TCL_ERROR;
@@ -442,7 +444,7 @@ int Geom_SeparateCenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( sys_geom_separatecenterlines( (cvPolyData*)linesSrc, (cvPolyData**)(&separateDst) )
+  if ( VMTKUtils_SeparateCenterlines( (cvPolyData*)linesSrc, (cvPolyData**)(&separateDst) )
        != SV_OK ) {
     Tcl_SetResult( interp, "error grouping centerlines", TCL_STATIC );
     return TCL_ERROR;
@@ -468,15 +470,17 @@ int Geom_MergeCenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   char *linesName;
   char *mergeName;
   int mergeblanked = 1;
+  int useVmtk = 1;
   cvRepositoryData *linesSrc;
   cvRepositoryData *mergeDst = NULL;
   RepositoryDataT type;
 
-  int table_size = 3;
+  int table_size = 4;
   ARG_Entry arg_table[] = {
     { "-lines", STRING_Type, &linesName, NULL, REQUIRED, 0, { 0 } },
     { "-result", STRING_Type, &mergeName, NULL, REQUIRED, 0, { 0 } },
     { "-mergeblanked", INT_Type, &mergeblanked, NULL, SV_OPTIONAL, 0, { 0 } },
+    { "-usevmtk", INT_Type, &useVmtk, NULL, SV_OPTIONAL, 0, { 0 } },
   };
   usage = ARG_GenSyntaxStr( 1, argv, table_size, arg_table );
   if ( argc == 1 ) {
@@ -507,7 +511,7 @@ int Geom_MergeCenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( sys_geom_mergecenterlines( (cvPolyData*)linesSrc, mergeblanked, (cvPolyData**)(&mergeDst) )
+  if ( VMTKUtils_MergeCenterlines( (cvPolyData*)linesSrc, mergeblanked,useVmtk, (cvPolyData**)(&mergeDst) )
        != SV_OK ) {
     Tcl_SetResult( interp, "error merging centerlines", TCL_STATIC );
     return TCL_ERROR;
@@ -583,7 +587,7 @@ int Geom_CapCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( sys_geom_cap( (cvPolyData*)geomSrc, (cvPolyData**)(&cappedDst), &numIds,&ids,captype )
+  if ( VMTKUtils_Cap( (cvPolyData*)geomSrc, (cvPolyData**)(&cappedDst), &numIds,&ids,captype )
        != SV_OK ) {
     Tcl_SetResult( interp, "error capping model", TCL_STATIC );
     return TCL_ERROR;
@@ -669,7 +673,7 @@ int Geom_CapWIdsCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( sys_geom_cap_with_ids( (cvPolyData*)geomSrc, (cvPolyData**)(&cappedDst)
+  if ( VMTKUtils_CapWithIds( (cvPolyData*)geomSrc, (cvPolyData**)(&cappedDst)
 	,fillId,num_filled,filltype)
        != SV_OK ) {
     Tcl_SetResult( interp, "error capping model", TCL_STATIC );
@@ -763,7 +767,7 @@ int Geom_MapAndCorrectIdsCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( sys_geom_mapandcorrectids( (cvPolyData*)geomSrc, (cvPolyData*)geomNew, (cvPolyData**)(&geomDst), originalArray,newArray )
+  if ( VMTKUtils_MapAndCorrectIds( (cvPolyData*)geomSrc, (cvPolyData*)geomNew, (cvPolyData**)(&geomDst), originalArray,newArray )
        != SV_OK ) {
     Tcl_SetResult( interp, "error correcting ids", TCL_STATIC );
     return TCL_ERROR;

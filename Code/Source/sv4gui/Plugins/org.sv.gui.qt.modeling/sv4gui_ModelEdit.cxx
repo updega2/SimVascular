@@ -312,6 +312,12 @@ void sv4guiModelEdit::CreateQtPartControl( QWidget *parent )
     connect(ui->btnExtractCenterlines, SIGNAL(clicked()), this, SLOT(ShowCapSelectionWidget()) );
 
     connect(m_CapSelectionWidget,SIGNAL(accepted()), this, SLOT(ExtractCenterlines()));
+
+    ////for advance
+    ////=================================================================
+    //connect(ui->btnRunDecomp, SIGNAL(clicked()), this, SLOT(ShowCapSelectionWidget()));
+
+    //connect(m_CapSelectionWidget,SIGNAL(accepted()), this, SLOT(AdvancedRunDecomp()));
 }
 
 void sv4guiModelEdit::Visible()
@@ -1772,7 +1778,7 @@ void sv4guiModelEdit::ExtractCenterlines()
 {
     if (m_ModelType != "PolyData")
     {
-      QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anyting other than a PolyData model");
+      QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
       return;
     }
 
@@ -1794,6 +1800,36 @@ void sv4guiModelEdit::ExtractCenterlines()
 
     return;
 }
+
+//void sv4guiModelEdit::AdvancedRunDecomp()
+//{
+//    if (m_ModelType != "PolyData")
+//    {
+//      QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
+//      return;
+//    }
+//
+//    int timeStep=GetTimeStep();
+//    sv4guiModelElement* modelElement=m_Model->GetModelElement(timeStep);
+//
+//    std::vector<std::string> capNames = m_CapSelectionWidget->GetUsedCapNames();
+//    std::vector<int> capIds;
+//    for (int i=0; i<capNames.size(); i++)
+//      capIds.push_back(modelElement->GetFaceID(capNames[i]));
+//
+//    // Get centerlines
+//    sv4guiModelExtractPathsAction *extractPathsAction = new sv4guiModelExtractPathsAction();
+//    extractPathsAction->SetDataStorage(this->GetDataStorage());
+//    extractPathsAction->SetFunctionality(this);
+//    extractPathsAction->SetSourceCapIds(capIds);
+//    QList<mitk::DataNode::Pointer> selectedNode;
+//    selectedNode.push_back(m_ModelNode);
+//    extractPathsAction->Run(selectedNode);
+//
+//    // Now run decomp stuffs
+//
+//    return;
+//}
 
 std::vector<sv4guiModelElement::svBlendParamRadius*> sv4guiModelEdit::GetBlendRadii()
 {

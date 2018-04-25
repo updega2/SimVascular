@@ -86,6 +86,8 @@ public slots:
 
     void ExtractCenterlines();
 
+    //void AdvancedRunDecomp();
+
     void UpdateFaceListSelection();
 
     void UpdateBlendTable(int index);

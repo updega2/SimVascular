@@ -58,6 +58,9 @@
 #include "vtkDataSetSurfaceFilter.h"
 #include "vtkGeometryFilter.h"
 #include "vtkCellArray.h"
+
+#include "vtkSVCenterlines.h"
+#include "vtkSVCenterlineMerger.h"
 #include "vtkSVFillHolesWithIdsFilter.h"
 
 #include "vtkvmtkPolyDataSurfaceRemeshing.h"
@@ -80,7 +83,7 @@
   vtkSmartPointer<type> name = vtkSmartPointer<type>::New()
 
 /* -------------- */
-/* sys_geom_centerlines */
+/* VMTKUtils_Centerlines */
 /* -------------- */
 
 /** @author Adam Updegrove
@@ -100,8 +103,8 @@
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_centerlines( cvPolyData *polydata,int *sources,int nsources,
-		int *targets,int ntargets,
+int VMTKUtils_Centerlines( cvPolyData *polydata,int *sources,int nsources,
+		int *targets,int ntargets, int useVmtk,
 		cvPolyData **lines, cvPolyData **voronoi)
 {
   vtkPolyData *geom = polydata->GetVtkPolyData();
@@ -127,37 +130,67 @@ int sys_geom_centerlines( cvPolyData *polydata,int *sources,int nsources,
     capOutletIds->InsertNextId(*targets+pointId);
   }
 
-  vtkNew(vtkvmtkPolyDataCenterlines,centerLiner);
-  try {
-    std::cout<<"Getting Center Lines..."<<endl;
-    centerLiner->SetInputData(geom);
-    centerLiner->SetSourceSeedIds(capInletIds);
-    centerLiner->SetTargetSeedIds(capOutletIds);
-    centerLiner->SetRadiusArrayName("MaximumInscribedSphereRadius");
-    centerLiner->SetCostFunction("1/R");
-    centerLiner->SetFlipNormals(0);
-    centerLiner->SetAppendEndPointsToCenterlines(1);
-    centerLiner->SetSimplifyVoronoi(0);
-    centerLiner->SetCenterlineResampling(0);
-    centerLiner->SetResamplingStepLength(1);
-    centerLiner->Update();
+  if (useVmtk)
+  {
+    vtkNew(vtkvmtkPolyDataCenterlines,centerLiner);
+    try {
+      std::cout<<"Getting Center Lines..."<<endl;
+      centerLiner->SetInputData(geom);
+      centerLiner->SetSourceSeedIds(capInletIds);
+      centerLiner->SetTargetSeedIds(capOutletIds);
+      centerLiner->SetRadiusArrayName("MaximumInscribedSphereRadius");
+      centerLiner->SetCostFunction("1/R");
+      centerLiner->SetFlipNormals(0);
+      centerLiner->SetAppendEndPointsToCenterlines(1);
+      centerLiner->SetSimplifyVoronoi(0);
+      centerLiner->SetCenterlineResampling(0);
+      centerLiner->SetResamplingStepLength(1);
+      centerLiner->Update();
 
-    result1 = new cvPolyData( centerLiner->GetOutput() );
-    *lines = result1;
-    result2 = new cvPolyData( centerLiner->GetVoronoiDiagram() );
-    *voronoi = result2;
+      result1 = new cvPolyData( centerLiner->GetOutput() );
+      *lines = result1;
+      result2 = new cvPolyData( centerLiner->GetVoronoiDiagram() );
+      *voronoi = result2;
+    }
+    catch (...) {
+      fprintf(stderr,"ERROR in centerline operation.\n");
+      fflush(stderr);
+      return SV_ERROR;
+    }
   }
-  catch (...) {
-    fprintf(stderr,"ERROR in centerline operation.\n");
-    fflush(stderr);
-    return SV_ERROR;
+  else
+  {
+    vtkNew(vtkSVCenterlines,centerLiner);
+    try {
+      std::cout<<"Getting Center Lines..."<<endl;
+      centerLiner->SetInputData(geom);
+      centerLiner->SetSourceSeedIds(capInletIds);
+      centerLiner->SetTargetSeedIds(capOutletIds);
+      centerLiner->SetRadiusArrayName("MaximumInscribedSphereRadius");
+      centerLiner->SetCostFunction("1/R");
+      centerLiner->SetFlipNormals(0);
+      centerLiner->SetAppendEndPointsToCenterlines(1);
+      centerLiner->SetSimplifyVoronoi(0);
+      centerLiner->SetCenterlineResampling(0);
+      centerLiner->Update();
+
+      result1 = new cvPolyData( centerLiner->GetOutput() );
+      *lines = result1;
+      result2 = new cvPolyData( centerLiner->GetVoronoiDiagram() );
+      *voronoi = result2;
+    }
+    catch (...) {
+      fprintf(stderr,"ERROR in centerline operation.\n");
+      fflush(stderr);
+      return SV_ERROR;
+    }
   }
 
   return SV_OK;
 }
 
 /* -------------- */
-/* sys_geom_mergecenterlines */
+/* VMTKUtils_MergeCenterlines */
 /* -------------- */
 
 /** @author Adam Updegrove
@@ -177,41 +210,65 @@ int sys_geom_centerlines( cvPolyData *polydata,int *sources,int nsources,
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_mergecenterlines( cvPolyData *lines, int mergeblanked,
+int VMTKUtils_MergeCenterlines( cvPolyData *lines, int mergeblanked, int useVmtk,
 		cvPolyData **merged)
 {
   vtkPolyData *geom = lines->GetVtkPolyData();
   cvPolyData *result1 = NULL;
   *merged = NULL;
 
-  vtkNew(vtkvmtkMergeCenterlines, merger);
-  try {
-    std::cout<<"Merging Sections..."<<endl;
-    merger->SetInputData(geom);
-    merger->SetBlankingArrayName("Blanking");
-    merger->SetRadiusArrayName("MaximumInscribedSphereRadius");
-    merger->SetGroupIdsArrayName("GroupIds");
-    merger->SetCenterlineIdsArrayName("CenterlineIds");
-    merger->SetTractIdsArrayName("TractIds");
-    merger->SetMergeBlanked(mergeblanked);
-    merger->Update();
+  if (useVmtk)
+  {
+    vtkNew(vtkvmtkMergeCenterlines, merger);
+    try {
+      std::cout<<"Merging Sections..."<<endl;
+      merger->SetInputData(geom);
+      merger->SetBlankingArrayName("Blanking");
+      merger->SetRadiusArrayName("MaximumInscribedSphereRadius");
+      merger->SetGroupIdsArrayName("GroupIds");
+      merger->SetCenterlineIdsArrayName("CenterlineIds");
+      merger->SetTractIdsArrayName("TractIds");
+      merger->SetMergeBlanked(mergeblanked);
+      merger->Update();
 
-    result1 = new cvPolyData( merger->GetOutput() );
-    *merged = result1;
+      result1 = new cvPolyData( merger->GetOutput() );
+      *merged = result1;
+    }
+    catch (...) {
+      fprintf(stderr,"ERROR in centerline merging.\n");
+      fflush(stderr);
+      return SV_ERROR;
+    }
   }
-  catch (...) {
-    fprintf(stderr,"ERROR in centerline merging.\n");
-    fflush(stderr);
-    return SV_ERROR;
-  }
+  else
+  {
+    vtkNew(vtkSVCenterlineMerger, merger);
+    try {
+      std::cout<<"Merging Sections..."<<endl;
+      merger->SetInputData(geom);
+      merger->SetBlankingArrayName("Blanking");
+      merger->SetRadiusArrayName("MaximumInscribedSphereRadius");
+      merger->SetGroupIdsArrayName("GroupIds");
+      merger->SetCenterlineIdsArrayName("CenterlineIds");
+      merger->SetTractIdsArrayName("TractIds");
+      merger->SetMergeBlanked(mergeblanked);
+      merger->Update();
 
-  return SV_OK;
+      result1 = new cvPolyData( merger->GetOutput() );
+      *merged = result1;
+    }
+    catch (...) {
+      fprintf(stderr,"ERROR in centerline merging.\n");
+      fflush(stderr);
+      return SV_ERROR;
+    }
+  }
 
   return SV_OK;
 }
 
 /* -------------- */
-/* sys_geom_separatecenterlines */
+/* VMTKUtils_SeparateCenterlines */
 /* -------------- */
 
 /** @author Adam Updegrove
@@ -228,7 +285,7 @@ int sys_geom_mergecenterlines( cvPolyData *lines, int mergeblanked,
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_separatecenterlines( cvPolyData *lines,
+int VMTKUtils_SeparateCenterlines( cvPolyData *lines,
 		cvPolyData **separate)
 {
   vtkPolyData *geom = lines->GetVtkPolyData();
@@ -259,7 +316,7 @@ int sys_geom_separatecenterlines( cvPolyData *lines,
 }
 
 /* -------------- */
-/* sys_geom_grouppolydata */
+/* VMTKUtils_GroupPolyData */
 /* -------------- */
 
 /** @author Adam Updegrove
@@ -274,7 +331,7 @@ int sys_geom_separatecenterlines( cvPolyData *lines,
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_grouppolydata( cvPolyData *polydata,cvPolyData *lines,
+int VMTKUtils_GroupPolyData( cvPolyData *polydata,cvPolyData *lines,
 		cvPolyData **grouped)
 {
   vtkPolyData *geom = polydata->GetVtkPolyData();
@@ -309,7 +366,7 @@ int sys_geom_grouppolydata( cvPolyData *polydata,cvPolyData *lines,
 }
 
 /* -------------- */
-/* sys_geom_distancetocenterlines */
+/* VMTKUtils_DistanceToCenterlines */
 /* -------------- */
 
 /** @author Adam Updegrove
@@ -324,7 +381,7 @@ int sys_geom_grouppolydata( cvPolyData *polydata,cvPolyData *lines,
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_distancetocenterlines( cvPolyData *polydata,cvPolyData *lines,
+int VMTKUtils_DistanceToCenterlines( cvPolyData *polydata,cvPolyData *lines,
 		cvPolyData **distance)
 {
   vtkPolyData *geom = polydata->GetVtkPolyData();
@@ -357,7 +414,7 @@ int sys_geom_distancetocenterlines( cvPolyData *polydata,cvPolyData *lines,
 }
 
 /* -------------- */
-/* sys_geom_cap */
+/* VMTKUtils_Cap */
 /* -------------- */
 
 /** @author Adam Updegrove
@@ -376,7 +433,7 @@ int sys_geom_distancetocenterlines( cvPolyData *polydata,cvPolyData *lines,
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_cap( cvPolyData *polydata,cvPolyData **cappedpolydata,int *numcenterids,int **centerids,int type)
+int VMTKUtils_Cap( cvPolyData *polydata,cvPolyData **cappedpolydata,int *numcenterids,int **centerids,int type)
 {
   vtkPolyData *geom = polydata->GetVtkPolyData();
   cvPolyData *result = NULL;
@@ -442,7 +499,7 @@ int sys_geom_cap( cvPolyData *polydata,cvPolyData **cappedpolydata,int *numcente
 }
 
 /* -------------- */
-/* sys_geom_cap_with_ids */
+/* VMTKUtils_CapWithIds */
 /* -------------- */
 
 /** @author Adam Updegrove
@@ -463,7 +520,7 @@ int sys_geom_cap( cvPolyData *polydata,cvPolyData **cappedpolydata,int *numcente
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_cap_with_ids( cvPolyData *polydata,cvPolyData **cappedpolydata,
+int VMTKUtils_CapWithIds( cvPolyData *polydata,cvPolyData **cappedpolydata,
     int fillId,int filledholes,int filltype)
 {
 
@@ -531,7 +588,7 @@ int sys_geom_cap_with_ids( cvPolyData *polydata,cvPolyData **cappedpolydata,
 }
 
 /* -------------- */
-/* sys_geom_mapandcorrectids */
+/* VMTKUtils_MapAndCorrectIds */
 /* -------------- */
 
 /** @author Adam Updegrove
@@ -550,7 +607,7 @@ int sys_geom_cap_with_ids( cvPolyData *polydata,cvPolyData **cappedpolydata,
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_mapandcorrectids( cvPolyData *originalpd, cvPolyData *newpd, cvPolyData **polydata,char *originalarray, char *newarray)
+int VMTKUtils_MapAndCorrectIds( cvPolyData *originalpd, cvPolyData *newpd, cvPolyData **polydata,char *originalarray, char *newarray)
 {
   vtkPolyData *originalgeom = originalpd->GetVtkPolyData();
   vtkPolyData *newgeom = newpd->GetVtkPolyData();
