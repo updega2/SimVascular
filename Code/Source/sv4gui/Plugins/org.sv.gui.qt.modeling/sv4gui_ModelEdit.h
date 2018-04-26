@@ -86,7 +86,7 @@ public slots:
 
     void ExtractCenterlines();
 
-    //void AdvancedRunDecomp();
+    void AdvancedRunDecomp();
 
     void UpdateFaceListSelection();
 

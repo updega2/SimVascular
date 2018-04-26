@@ -409,11 +409,13 @@ int Geom_SeparateCenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   cvRepositoryData *linesSrc;
   cvRepositoryData *separateDst = NULL;
   RepositoryDataT type;
+  int useVmtk = 1;
 
-  int table_size = 2;
+  int table_size = 3;
   ARG_Entry arg_table[] = {
     { "-lines", STRING_Type, &linesName, NULL, REQUIRED, 0, { 0 } },
     { "-result", STRING_Type, &separateName, NULL, REQUIRED, 0, { 0 } },
+    { "-usevmtk", INT_Type, &useVmtk, NULL, SV_OPTIONAL, 0, { 0 } },
   };
   usage = ARG_GenSyntaxStr( 1, argv, table_size, arg_table );
   if ( argc == 1 ) {
@@ -444,7 +446,7 @@ int Geom_SeparateCenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( VMTKUtils_SeparateCenterlines( (cvPolyData*)linesSrc, (cvPolyData**)(&separateDst) )
+  if ( VMTKUtils_SeparateCenterlines( (cvPolyData*)linesSrc, useVmtk, (cvPolyData**)(&separateDst) )
        != SV_OK ) {
     Tcl_SetResult( interp, "error grouping centerlines", TCL_STATIC );
     return TCL_ERROR;

@@ -35,6 +35,7 @@
 #include "sv4gui_FaceListDelegate.h"
 #include "sv4gui_Path.h"
 #include "sv4gui_MitkSeg3D.h"
+#include "sv4gui_ModelUtils.h"
 #include "sv4gui_SegmentationUtils.h"
 #include "sv4gui_ModelElementFactory.h"
 #include "sv4gui_ModelElementAnalytic.h"
@@ -47,6 +48,7 @@
 #include <mitkNodePredicateDataType.h>
 #include <mitkUndoController.h>
 #include <mitkSliceNavigationController.h>
+#include <mitkSurface.h>
 #include <mitkProgressBar.h>
 #include <mitkStatusBar.h>
 #include <mitkUnstructuredGrid.h>
@@ -313,11 +315,9 @@ void sv4guiModelEdit::CreateQtPartControl( QWidget *parent )
 
     connect(m_CapSelectionWidget,SIGNAL(accepted()), this, SLOT(ExtractCenterlines()));
 
-    ////for advance
-    ////=================================================================
-    //connect(ui->btnRunDecomp, SIGNAL(clicked()), this, SLOT(ShowCapSelectionWidget()));
-
-    //connect(m_CapSelectionWidget,SIGNAL(accepted()), this, SLOT(AdvancedRunDecomp()));
+    //for advance
+    //=================================================================
+    connect(ui->btnRunDecomp,SIGNAL(clicked()), this, SLOT(AdvancedRunDecomp()));
 }
 
 void sv4guiModelEdit::Visible()
@@ -1801,35 +1801,44 @@ void sv4guiModelEdit::ExtractCenterlines()
     return;
 }
 
-//void sv4guiModelEdit::AdvancedRunDecomp()
-//{
-//    if (m_ModelType != "PolyData")
-//    {
-//      QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
-//      return;
-//    }
-//
-//    int timeStep=GetTimeStep();
-//    sv4guiModelElement* modelElement=m_Model->GetModelElement(timeStep);
-//
-//    std::vector<std::string> capNames = m_CapSelectionWidget->GetUsedCapNames();
-//    std::vector<int> capIds;
-//    for (int i=0; i<capNames.size(); i++)
-//      capIds.push_back(modelElement->GetFaceID(capNames[i]));
-//
-//    // Get centerlines
-//    sv4guiModelExtractPathsAction *extractPathsAction = new sv4guiModelExtractPathsAction();
-//    extractPathsAction->SetDataStorage(this->GetDataStorage());
-//    extractPathsAction->SetFunctionality(this);
-//    extractPathsAction->SetSourceCapIds(capIds);
-//    QList<mitk::DataNode::Pointer> selectedNode;
-//    selectedNode.push_back(m_ModelNode);
-//    extractPathsAction->Run(selectedNode);
-//
-//    // Now run decomp stuffs
-//
-//    return;
-//}
+void sv4guiModelEdit::AdvancedRunDecomp()
+{
+    if (m_ModelType != "PolyData")
+    {
+      QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
+      return;
+    }
+
+    // Check to make sure merged centerlines exist, complain if not
+    mitk::DataNode::Pointer centerlinesModelNode = this->GetDataStorage()->GetNamedDerivedNode("Full_Centerlines", m_ModelNode);
+
+    if (centerlinesModelNode.IsNull())
+    {
+      QMessageBox::warning(m_Parent,"Error","Must first extract centerlines to be able to use this functionality");
+      return;
+    }
+
+    mitk::Surface::Pointer centerlinesSurface = dynamic_cast<mitk::Surface*>(centerlinesModelNode->GetData());
+
+    int timeStep=GetTimeStep();
+    sv4guiModelElement* modelElement=m_Model->GetModelElement(timeStep);
+
+    vtkPolyData *decomposedPolyData = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
+
+    //// Get centerlines
+    //sv4guiModelExtractPathsAction *extractPathsAction = new sv4guiModelExtractPathsAction();
+    //extractPathsAction->SetDataStorage(this->GetDataStorage());
+    //extractPathsAction->SetFunctionality(this);
+    //extractPathsAction->SetSourceCapIds(capIds);
+    //QList<mitk::DataNode::Pointer> selectedNode;
+    //selectedNode.push_back(m_ModelNode);
+
+    //extractPathsAction->Run(selectedNode);
+
+    // Now run decomp stuffs
+
+    return;
+}
 
 std::vector<sv4guiModelElement::svBlendParamRadius*> sv4guiModelEdit::GetBlendRadii()
 {

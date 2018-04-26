@@ -964,6 +964,31 @@ bool sv4guiModelUtils::DeleteRegions(vtkSmartPointer<vtkPolyData> inpd, std::vec
     return true;
 }
 
+vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement,
+                                                vtkPolyData *mergedCenterlines)
+{
+
+  if(modelElement==NULL || modelElement->GetWholeVtkPolyData()==NULL)
+      return NULL;
+
+  cvPolyData *modelPolyData = new cvPolyData(modelElement->GetWholeVtkPolyData());
+  cvPolyData *mergedPolyData = new cvPolyData(mergedCenterlines);
+  cvPolyData *decomposedPolyData = NULL;
+
+  if ( VMTKUtils_DecomposePolyData(modelPolyData, mergedPolyData, &decomposedPolyData) != SV_OK )
+  {
+    delete modelPolyData;
+    delete mergedPolyData;
+    if (decomposedPolyData != NULL)
+    {
+      delete decomposedPolyData;
+    }
+    return NULL;
+  }
+
+  return decomposedPolyData->GetVtkPolyData();
+}
+
 vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElement,
                                              vtkIdList *sourceCapIds, int useVmtk)
 {
@@ -1142,7 +1167,7 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd,
     delete [] targets;
 
     cvPolyData *centerlines=NULL;
-    if ( VMTKUtils_SeparateCenterlines(tempCenterlines, &centerlines) != SV_OK )
+    if ( VMTKUtils_SeparateCenterlines(tempCenterlines, useVmtk, &centerlines) != SV_OK )
     {
         delete tempCenterlines;
         return NULL;

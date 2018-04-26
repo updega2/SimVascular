@@ -59,9 +59,11 @@
 #include "vtkGeometryFilter.h"
 #include "vtkCellArray.h"
 
-#include "vtkSVCenterlines.h"
+#include "vtkSVCenterlineBranchSplitter.h"
 #include "vtkSVCenterlineMerger.h"
+#include "vtkSVCenterlines.h"
 #include "vtkSVFillHolesWithIdsFilter.h"
+#include "vtkSVGroupsSegmenter.h"
 
 #include "vtkvmtkPolyDataSurfaceRemeshing.h"
 #include "vtkvmtkPolyDataSizingFunction.h"
@@ -285,26 +287,113 @@ int VMTKUtils_MergeCenterlines( cvPolyData *lines, int mergeblanked, int useVmtk
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int VMTKUtils_SeparateCenterlines( cvPolyData *lines,
+int VMTKUtils_SeparateCenterlines( cvPolyData *lines, int useVmtk,
 		cvPolyData **separate)
 {
   vtkPolyData *geom = lines->GetVtkPolyData();
   cvPolyData *result1 = NULL;
   *separate = NULL;
 
-  vtkNew(vtkvmtkCenterlineBranchExtractor,brancher);
+  if (useVmtk)
+  {
+    vtkNew(vtkvmtkCenterlineBranchExtractor,brancher);
+    try {
+      std::cout<<"Grouping Sections..."<<endl;
+      brancher->SetInputData(geom);
+      brancher->SetBlankingArrayName("Blanking");
+      brancher->SetRadiusArrayName("MaximumInscribedSphereRadius");
+      brancher->SetGroupIdsArrayName("GroupIds");
+      brancher->SetCenterlineIdsArrayName("CenterlineIds");
+      brancher->SetTractIdsArrayName("TractIds");
+      brancher->Update();
+
+      result1 = new cvPolyData( brancher->GetOutput() );
+      *separate = result1;
+    }
+    catch (...) {
+      fprintf(stderr,"ERROR in centerline separation.\n");
+      fflush(stderr);
+      return SV_ERROR;
+    }
+  }
+  else
+  {
+    vtkNew(vtkSVCenterlineBranchSplitter,brancher);
+    try {
+      std::cout<<"Grouping Sections..."<<endl;
+      brancher->SetInputData(geom);
+      brancher->SetGroupingModeToFirstPoint();
+      brancher->SetBlankingArrayName("Blanking");
+      brancher->SetRadiusArrayName("MaximumInscribedSphereRadius");
+      brancher->SetGroupIdsArrayName("GroupIds");
+      brancher->SetCenterlineIdsArrayName("CenterlineIds");
+      brancher->SetTractIdsArrayName("TractIds");
+      brancher->SetRadiusMergeRatio(0.1);
+      brancher->SetUseAbsoluteMergeDistance(0);
+      brancher->SetMergeDistance(0.1);
+      brancher->Update();
+
+      result1 = new cvPolyData( brancher->GetOutput() );
+      *separate = result1;
+    }
+    catch (...) {
+      fprintf(stderr,"ERROR in centerline separation.\n");
+      fflush(stderr);
+      return SV_ERROR;
+    }
+  }
+
+  return SV_OK;
+}
+
+/* -------------- */
+/* VMTKUtils_DecomposePolyData */
+/* -------------- */
+
+/** @author Adam Updegrove
+ *  @author updega2@gmail.com
+ *  @author UC Berkeley
+ *  @author shaddenlab.berkeley.edu
+ *
+ *  @brief Function to extract centerlines from a vtkPolyData surface
+ *  @brief VTMK is called to do this. Each cap on PolyData has an
+ *  @brief id and then each id is set as either inlet or outlet.
+ *  @param *sources list of source cap ids
+ *  @param nsources number of source cap ids
+ *  @param *targets list of target cap ids
+ *  @param ntargets number of target cap ids
+ *  @param **lines returned center lines as vtkPolyData
+ *  @param ** voronoi returned voronoi diagram as vtkPolyData
+ *  @return SV_OK if the VTMK function executes properly
+ */
+
+int VMTKUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenterlines, cvPolyData **decomposedPolyData)
+{
+  vtkPolyData *geom = polydata->GetVtkPolyData();
+  vtkPolyData *centerlines = mergedCenterlines->GetVtkPolyData();
+  cvPolyData *result1 = NULL;
+  *decomposedPolyData = NULL;
+
+  vtkNew(vtkSVGroupsSegmenter, decomposer);
   try {
     std::cout<<"Grouping Sections..."<<endl;
-    brancher->SetInputData(geom);
-    brancher->SetBlankingArrayName("Blanking");
-    brancher->SetRadiusArrayName("MaximumInscribedSphereRadius");
-    brancher->SetGroupIdsArrayName("GroupIds");
-    brancher->SetCenterlineIdsArrayName("CenterlineIds");
-    brancher->SetTractIdsArrayName("TractIds");
-    brancher->Update();
+    decomposer->SetInputData(geom);
+    decomposer->SetCenterlines(centerlines);
+    decomposer->SetBlankingArrayName("Blanking");
+    decomposer->SetCenterlineRadiusArrayName("MaximumInscribedSphereRadius");
+    decomposer->SetGroupIdsArrayName("GroupIds");
+    decomposer->SetRadiusMergeRatio(0.1);
+    decomposer->SetUseAbsoluteMergeDistance(0);
+    decomposer->SetMergeDistance(0.1);
+    decomposer->SetEnforceBoundaryDirections(1);
+    decomposer->SetUseVmtkClipping(0);
+    decomposer->SetUseRadiusInformation(1);
+    decomposer->SetIsVasculature(1);
 
-    result1 = new cvPolyData( brancher->GetOutput() );
-    *separate = result1;
+    decomposer->Update();
+
+    result1 = new cvPolyData( decomposer->GetOutput() );
+    *decomposedPolyData = result1;
   }
   catch (...) {
     fprintf(stderr,"ERROR in centerline separation.\n");

@@ -105,6 +105,8 @@ public:
 
     static vtkPolyData* MergeCenterlines(vtkPolyData* centerlinesPD, int useVmtk);
 
+    static vtkPolyData* RunDecomposition(sv4guiModelElement* modelElement, vtkPolyData *mergedCenterlines);
+
     static vtkPolyData* CalculateDistanceToCenterlines(vtkPolyData* centerlines, vtkPolyData* original);
 
     static std::vector<sv4guiPathElement::sv4guiPathPoint> ConvertToPathPoints(std::vector<mitk::Point3D> posPoints);

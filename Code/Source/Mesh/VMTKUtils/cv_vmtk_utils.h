@@ -55,11 +55,13 @@ SV_EXPORT_VMTK_UTILS int VMTKUtils_Centerlines( cvPolyData *polydata, int *sourc
                             int *targets, int ntargets, int useVmtk,
 			    cvPolyData **lines, cvPolyData **voronoi);
 
+SV_EXPORT_VMTK_UTILS int VMTKUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenterlines, cvPolyData **decomposedPolyData);
+
 SV_EXPORT_VMTK_UTILS int VMTKUtils_GroupPolyData( cvPolyData *polydata,cvPolyData *lines,cvPolyData **grouped );
 
 SV_EXPORT_VMTK_UTILS int VMTKUtils_DistanceToCenterlines( cvPolyData *polydata,cvPolyData *lines,cvPolyData **distance );
 
-SV_EXPORT_VMTK_UTILS int VMTKUtils_SeparateCenterlines( cvPolyData *lines,cvPolyData **separate );
+SV_EXPORT_VMTK_UTILS int VMTKUtils_SeparateCenterlines( cvPolyData *lines,int useVmtk, cvPolyData **separate );
 
 SV_EXPORT_VMTK_UTILS int VMTKUtils_MergeCenterlines( cvPolyData *lines, int mergeblanked, int useVmtk, cvPolyData **merged);
 

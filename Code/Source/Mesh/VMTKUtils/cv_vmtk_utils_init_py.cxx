@@ -359,11 +359,12 @@ PyObject* Geom_SeparateCenterlinesCmd( PyObject* self, PyObject* args)
   cvRepositoryData *linesSrc;
   cvRepositoryData *separateDst = NULL;
   RepositoryDataT type;
+  int useVmtk = 1;
 
-  if (!PyArg_ParseTuple(args,"ss",&linesName, &separateName))
+  if (!PyArg_ParseTuple(args,"ssi",&linesName, &separateName, &useVmtk))
   {
     PyErr_SetString(PyRunTimeErr,
-	"Could not import two chars,linesName, separateName");
+	"Could not import two chars and integer,linesName, separateName, useVmtk");
     return Py_ERROR;
   }
   // Retrieve source object:
@@ -381,7 +382,7 @@ PyObject* Geom_SeparateCenterlinesCmd( PyObject* self, PyObject* args)
 
   // Do work of command:
 
-  if ( VMTKUtils_SeparateCenterlines( (cvPolyData*)linesSrc, (cvPolyData**)(&separateDst) )
+  if ( VMTKUtils_SeparateCenterlines( (cvPolyData*)linesSrc, useVmtk, (cvPolyData**)(&separateDst) )
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr, "error grouping centerlines" );
     return Py_ERROR;

@@ -14,7 +14,7 @@
    <enum>Qt::CustomContextMenu</enum>
   </property>
   <property name="windowTitle">
-   <string>Create Solid Model</string>
+   <string>Select Source Cap</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
