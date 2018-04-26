@@ -441,8 +441,8 @@ void sv4guiSeg2DEdit::OnSelectionChanged(std::vector<mitk::DataNode*> nodes )
 
     m_DataInteractor = sv4guiContourGroupDataInteractor::New();
     m_DataInteractor->SetInteraction3D(false);
-    m_DataInteractor->LoadStateMachine("sv4guiContourGroupInteraction.xml", us::ModuleRegistry::GetModule("sv4guiSegmentation"));
-    m_DataInteractor->SetEventConfig("sv4guiSegmentationConfig.xml", us::ModuleRegistry::GetModule("sv4guiSegmentation"));
+    m_DataInteractor->LoadStateMachine("sv4gui_ContourGroupInteraction.xml", us::ModuleRegistry::GetModule("svSegmentation"));
+    m_DataInteractor->SetEventConfig("sv4gui_SegmentationConfig.xml", us::ModuleRegistry::GetModule("svSegmentation"));
     m_DataInteractor->SetDataNode(m_ContourGroupNode);
 
     //Add Observer
