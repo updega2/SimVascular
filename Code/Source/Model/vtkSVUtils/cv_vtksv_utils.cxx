@@ -275,14 +275,14 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
       // Set up new structured grid for nurbs surface lofting
       int newDims[3];
       newDims[0] = whl_divs[3]; newDims[1] = 2*whl_divs[1] + 2*whl_divs[2] - 3; newDims[2] = 1;
-      //if (groupId == 3)
-      //{
-      //  continue;
-      //}
-      //else if (groupId == 2)
-      //{
-      //  newDims[0] = 4; newDims[1] = savePoints->GetNumberOfPoints(); newDims[2] = 1;
-      //}
+      if (groupId == 3)
+      {
+        continue;
+      }
+      else if (groupId == 2)
+      {
+        newDims[0] = 4; newDims[1] = savePoints->GetNumberOfPoints(); newDims[2] = 1;
+      }
       vtkNew(vtkStructuredGrid, inputGrid);
       vtkNew(vtkPoints, inputGridPoints);
       inputGridPoints->SetNumberOfPoints(newDims[0] * newDims[1]);
@@ -318,13 +318,13 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
             newPos[0] = j; newPos[1] = rowCount++; newPos[2] = 0;
             ptId = vtkStructuredData::ComputePointId(newDims, newPos);
             inputGrid->GetPoints()->SetPoint(ptId, pt);
-            //if (groupId == 0)
-            //{
-            //  if (j == 0)
-            //  {
-            //    savePoints->InsertNextPoint(pt);
-            //  }
-            //}
+            if (groupId == 0)
+            {
+              if (j == 0)
+              {
+                savePoints->InsertNextPoint(pt);
+              }
+            }
           }
         }
         // Go along right edge
@@ -347,13 +347,13 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
             newPos[0] = j; newPos[1] = rowCount++; newPos[2] = 0;
             ptId = vtkStructuredData::ComputePointId(newDims, newPos);
             inputGrid->GetPoints()->SetPoint(ptId, pt);
-            //if (groupId == 0)
-            //{
-            //  if (j == 0)
-            //  {
-            //    savePoints->InsertNextPoint(pt);
-            //  }
-            //}
+            if (groupId == 0)
+            {
+              if (j == 0)
+              {
+                savePoints->InsertNextPoint(pt);
+              }
+            }
           }
         }
         // Go along top edge
@@ -376,13 +376,13 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
             newPos[0] = j; newPos[1] = rowCount++; newPos[2] = 0;
             ptId = vtkStructuredData::ComputePointId(newDims, newPos);
             inputGrid->GetPoints()->SetPoint(ptId, pt);
-            //if (groupId == 0)
-            //{
-            //  if (j == 0)
-            //  {
-            //    savePoints->InsertNextPoint(pt);
-            //  }
-            //}
+            if (groupId == 0)
+            {
+              if (j == 0)
+              {
+                savePoints->InsertNextPoint(pt);
+              }
+            }
           }
         }
 
@@ -406,32 +406,32 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
             newPos[0] = j; newPos[1] = rowCount++; newPos[2] = 0;
             ptId = vtkStructuredData::ComputePointId(newDims, newPos);
             inputGrid->GetPoints()->SetPoint(ptId, pt);
-            //if (groupId == 0)
-            //{
-            //  if (j == 0)
-            //  {
-            //    savePoints->InsertNextPoint(pt);
-            //  }
-            //}
+            if (groupId == 0)
+            {
+              if (j == 0)
+              {
+                savePoints->InsertNextPoint(pt);
+              }
+            }
           }
         }
 
-        //if (groupId == 2)
-        //{
-        //  for (int k=0; k<savePoints->GetNumberOfPoints(); k++)
-        //  {
-        //    savePoints->GetPoint(k, pt);
+        if (groupId == 2)
+        {
+          for (int k=0; k<savePoints->GetNumberOfPoints(); k++)
+          {
+            savePoints->GetPoint(k, pt);
 
-        //    newPos[0] = j; newPos[1] = k; newPos[2] = 0;
-        //    ptId = vtkStructuredData::ComputePointId(newDims, newPos);
+            newPos[0] = j; newPos[1] = k; newPos[2] = 0;
+            ptId = vtkStructuredData::ComputePointId(newDims, newPos);
 
-        //    for (int l=0; l<3; l++)
-        //    {
-        //      pt[2] = pt[2] - j*10.0;
-        //    }
-        //    inputGrid->GetPoints()->SetPoint(ptId, pt);
-        //  }
-        //}
+            for (int l=0; l<3; l++)
+            {
+              pt[2] = pt[2] - j*10.0;
+            }
+            inputGrid->GetPoints()->SetPoint(ptId, pt);
+          }
+        }
       }
 
       // Now loft each surface
