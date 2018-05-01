@@ -135,6 +135,7 @@ PyObject* Geom_CenterlinesCmd( PyObject* self, PyObject* args)
   char *usage;
   PyObject* sourceList;
   PyObject* targetList;
+  PyObject* capCenterList;
   char *linesName;
   char *voronoiName;
   char *geomName;
@@ -144,11 +145,11 @@ PyObject* Geom_CenterlinesCmd( PyObject* self, PyObject* args)
   RepositoryDataT type;
   int useVmtk = 1;
 
-  if (!PyArg_ParseTuple(args,"sOOssi",&geomName,&sourceList,&targetList,
+  if (!PyArg_ParseTuple(args,"sOOOssi",&geomName,&sourceList,&targetList, &capCenterList,
 	&linesName, &voronoiName, &useVmtk))
   {
     PyErr_SetString(PyRunTimeErr,
-	"Could not import three chars, two list,and one int, geomName, sourceList,"
+	"Could not import three chars, three list,and one int, geomName, sourceList,"
 	"targetList, linesName, voronoiName, useVmtk");
     return Py_ERROR;
   }
@@ -177,15 +178,17 @@ PyObject* Geom_CenterlinesCmd( PyObject* self, PyObject* args)
     return Py_ERROR;
   }
 
-  int nsources = PyList_Size(sourceList);
-  int ntargets = PyList_Size(targetList);
-  if (nsources==0||ntargets==0)
+  int nsources    = PyList_Size(sourceList);
+  int ntargets    = PyList_Size(targetList);
+  int ncapcenters = PyList_Size(capCenterList);
+  if (nsources==0 || ntargets==0)
   {
     return Py_BuildValue("s","success");
   }
 
   int *sources = new int[nsources];
   int *targets = new int[ntargets];
+  int *capcenters = NULL;
 
   for (int i=0;i<nsources;i++)
   {
@@ -195,16 +198,35 @@ PyObject* Geom_CenterlinesCmd( PyObject* self, PyObject* args)
   {
     targets[j]=PyLong_AsLong(PyList_GetItem(targetList,j));
   }
+  if (ncapcenters != 0)
+  {
+    int *capcenters = new int[ncapcenters];
+    for (int j=0;j<ncapcenters;j++)
+    {
+      capcenters[j]=PyLong_AsLong(PyList_GetItem(capCenterList,j));
+    }
+  }
   // Do work of command:
 
-  if ( VMTKUtils_Centerlines( (cvPolyData*)geomSrc, sources, nsources, targets, ntargets, useVmtk, (cvPolyData**)(&linesDst), (cvPolyData**)(&voronoiDst))
+  if ( VMTKUtils_Centerlines( (cvPolyData*)geomSrc, sources, nsources, targets, ntargets, capcenters, ncapcenters, useVmtk, (cvPolyData**)(&linesDst), (cvPolyData**)(&voronoiDst))
        != SV_OK ) {
     PyErr_SetString(PyRunTimeErr,"error creating centerlines");
+
+    delete [] sources;
+    delete [] targets;
+    if (capcenters != NULL)
+    {
+      delete [] capcenters;
+    }
     return Py_ERROR;
   }
 
   delete [] sources;
   delete [] targets;
+    if (capcenters != NULL)
+    {
+      delete [] capcenters;
+    }
 
   if ( !( gRepository->Register( linesName, linesDst ) ) ) {
     PyErr_SetString(PyRunTimeErr, "error registering obj in repository");

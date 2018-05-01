@@ -366,23 +366,11 @@ int OCCTUtils_CreateEdgeBlend(TopoDS_Shape &shape,
   return SV_OK;
 }
 // ---------------------
-// OCCTUtils_CreateEdgeBlend
+// OCCTUtils_CapShapeToSolid
 // ---------------------
 /**
- * @brief Procedure to create edge blend between two faces faceA and faceB
- * @param &shape shape containing faces and resultant shape with blend
- * @param shapetool the XDEDoc manager that contains attribute info
- * @param shapelabel the label for the shape registered in XDEDoc
- * @param filletmake the occt API to make a fillet
- * @param faceA first integer face to blend
- * @param faceB second integer face to blend
- * @param radius Maximum radius to set anywhere on the fillet.
- * @param minRadius Minimum radius to set anywhere on the fillet. A linear
- * interpolation is created between the minimum and maximum radius specified
- * based on the angle created bewteen the two faces at a set number of points
- * around the fillet edge. The new fillet radius value will be somehwere
- * between the maximum and minimum radius values given.
- * @param blendname Name to be given the new face created for the shape
+ * @brief
+ * @param
  * @return SV_OK if function completes properly
  */
 int OCCTUtils_CapShapeToSolid(TopoDS_Shape &shape,TopoDS_Shape &geom,
@@ -784,7 +772,7 @@ int OCCTUtils_ShapeFromBSplineSurface(const Handle(Geom_BSplineSurface) surface,
 
   shape = shell;
   TopoDS_Face first,last;
-  shape = OCCTUtils_MakeShell(shell, newW1, newW2, pres3d, first, last);
+  shape = OCCTUtils_MakeShell(shell);
 
   return SV_OK;
 }
@@ -954,9 +942,7 @@ Standard_Boolean OCCTUtils_PerformPlan(const TopoDS_Wire& W,
 /**
  * @brief Taken from BRepOffsetAPI_ThruSections
  */
-TopoDS_Solid OCCTUtils_MakeShell(TopoDS_Shell& shell, const TopoDS_Wire& wire1,
-  const TopoDS_Wire& wire2, const Standard_Real presPln,
-  TopoDS_Face& face1, TopoDS_Face& face2)
+TopoDS_Solid OCCTUtils_MakeShell(TopoDS_Shell& shell)
 {
   if (shell.IsNull())
     StdFail_NotDone::Raise("Thrusections is not build");
@@ -1579,9 +1565,9 @@ int OCCTUtils_CheckIsSolid(const TopoDS_Shape &shape,int &issue)
       BRepCheck_Status checker = statit.Value();
       if (checker != 0)
       {
-	issue = checker;
-	fprintf(stderr,"Shape is not solid!\n");
-	return SV_ERROR;
+        issue = checker;
+        fprintf(stderr,"Shape is not solid!\n");
+        return SV_ERROR;
       }
     }
     issue = 0;
@@ -1590,6 +1576,48 @@ int OCCTUtils_CheckIsSolid(const TopoDS_Shape &shape,int &issue)
     fprintf(stderr,"Shape caused error in solid check\n");
     return SV_ERROR;
   }
+
+  return SV_OK;
+}
+
+// ---------------------
+// OCCTUtils_SewShapes
+// ---------------------
+/**
+ * @brief
+ * @param
+ * @return SV_OK if function completes properly
+ */
+int OCCTUtils_SewShapes(std::vector<TopoDS_Shape> shapeList, double tolerance, TopoDS_Shape &newShape)
+{
+  for (int i=0; i<shapeList.size(); i++)
+  {
+    if (shapeList[i].Closed())
+    {
+      fprintf(stdout,"Shape %d is closed, shouldn't be\n", i);
+      return SV_OK;
+    }
+  }
+
+  //Attacher!
+  BRepBuilderAPI_Sewing attacher(tolerance);
+  for (int i=0; i<shapeList.size(); i++)
+  {
+    attacher.Add(shapeList[i]);
+  }
+  attacher.Perform();
+
+  TopoDS_Shell tmpShell;
+  try {
+    tmpShell = TopoDS::Shell(attacher.SewedShape());
+  }
+  catch (Standard_TypeMismatch) {
+    fprintf(stderr,"Couldn't sew surfaces together\n");
+    return SV_ERROR;
+  }
+
+  BRepBuilderAPI_MakeSolid solidmaker(tmpShell);
+  newShape = solidmaker.Solid();
 
   return SV_OK;
 }

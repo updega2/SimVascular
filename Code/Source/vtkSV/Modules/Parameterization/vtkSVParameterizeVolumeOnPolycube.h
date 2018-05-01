@@ -47,17 +47,17 @@
 
 #include "vtkIdList.h"
 #include "vtkMatrix4x4.h"
-#include "vtkPolyDataAlgorithm.h"
+#include "vtkUnstructuredGridAlgorithm.h"
 #include "vtkPolyData.h"
 #include "vtkStructuredGrid.h"
 #include "vtkUnstructuredGrid.h"
 
 #include "vtkSVGlobals.h"
 
-class VTKSVPARAMETERIZATION_EXPORT vtkSVParameterizeVolumeOnPolycube : public vtkPolyDataAlgorithm
+class VTKSVPARAMETERIZATION_EXPORT vtkSVParameterizeVolumeOnPolycube : public vtkUnstructuredGridAlgorithm
 {
 public:
-  vtkTypeMacro(vtkSVParameterizeVolumeOnPolycube,vtkPolyDataAlgorithm);
+  vtkTypeMacro(vtkSVParameterizeVolumeOnPolycube,vtkUnstructuredGridAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent) override;
 
   static vtkSVParameterizeVolumeOnPolycube *New();
@@ -87,32 +87,12 @@ public:
   vtkGetStringMacro(GroupIdsArrayName);
   //@}
 
-  static int GetRegions(vtkPolyData *pd, std::string arrayName,
-                        std::vector<Region> &allRegions);
-
-  static int GetCCWPoint(vtkPolyData *pd, const int pointId, const int cellId);
-  static int GetCWPoint(vtkPolyData *pd, const int pointId, const int cellId);
-
-  static int CheckBoundaryEdge(vtkPolyData *pd, std::string arrayName, const int cellId, const int pointId0, const int pointId1);
-
-  static int GetPointEdgeCells(vtkPolyData *pd, std::string arrayName,
-                               const int cellId, const int pointId,
-                               vtkIdList *sameCells);
-
-  static int FindPointMatchingValues(vtkPointSet *ps, std::string arrayName, vtkIdList *matchingVals, int &returnPtId);
-
-  static int RotateGroupToGlobalAxis(vtkPolyData *pd,
-                                     const int thresholdId,
-                                     std::string arrayName,
-                                     vtkPolyData *rotPd,
-                                     vtkMatrix4x4 *rotMatrix0,
-                                     vtkMatrix4x4 *rotMatrix1);
-  static int InterpolateMapOntoTarget(vtkPolyData *sourceBasePd,
-                                      vtkPolyData *targetPd,
-                                      vtkPolyData *targetBasePd,
-                                      vtkPolyData *mappedPd,
-                                      std::string dataMatchingArrayName);
-
+  //@{
+  /// \brief Get/Set macro for array name used for the grid point ids
+  // on the polycube unstructured grid
+  vtkSetStringMacro(GridIdsArrayName);
+  vtkGetStringMacro(GridIdsArrayName);
+  //@}
 
 protected:
   vtkSVParameterizeVolumeOnPolycube();
@@ -122,6 +102,13 @@ protected:
   virtual int RequestData(vtkInformation *,
                           vtkInformationVector **,
                           vtkInformationVector *) override;
+  virtual int FillInputPortInformation(int, vtkInformation *) override;
+
+  int InterpolateMapOntoTarget(vtkPolyData *sourceBasePd,
+                               vtkPolyData *targetPd,
+                               vtkPolyData *targetBasePd,
+                               vtkPolyData *mappedPd,
+                               std::string dataMatchingArrayName);
 
   int GetInteriorPointMaps(vtkPolyData *pdWithAllInterior,
                            vtkPolyData *pdWithCleanInterior,
@@ -149,6 +136,7 @@ protected:
                 vtkStructuredGrid *mappedVolume);
   int ConvertUGToSG(vtkUnstructuredGrid *ug,
                     vtkStructuredGrid *sg,
+                    std::string pointArrayName,
                     const int w_div, const int h_div, const int l_div);
   int GetPointConnectivity(vtkUnstructuredGrid *hexMesh,
                            std::vector<std::vector<int> > &ptEdgeNeighbors);
@@ -167,6 +155,7 @@ protected:
   int RunFilter(); // Run filter operations.
 
   char *GroupIdsArrayName;
+  char *GridIdsArrayName;
 
 private:
   vtkSVParameterizeVolumeOnPolycube(const vtkSVParameterizeVolumeOnPolycube&);  // Not implemented.

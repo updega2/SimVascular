@@ -116,6 +116,8 @@ SV_EXPORT_OPENCASCADE int OCCTUtils_ShapeFromBSplineSurface(const Handle(Geom_BS
 SV_EXPORT_OPENCASCADE int OCCTUtils_CapShapeToSolid(TopoDS_Shape &shape,TopoDS_Shape &geom,
     		BRepBuilderAPI_Sewing &attacher,int &numFilled);
 
+SV_EXPORT_OPENCASCADE int OCCTUtils_SewShapes(std::vector<TopoDS_Shape> shapeList, double tolerance, TopoDS_Shape &newShape);
+
 /* -------- */
 /* Helpers for loft */
 /* -------- */
@@ -134,9 +136,7 @@ SV_EXPORT_OPENCASCADE Standard_Boolean OCCTUtils_IsSameOriented(const TopoDS_Sha
 SV_EXPORT_OPENCASCADE Standard_Boolean OCCTUtils_IsSameOrientedWEdge(const TopoDS_Shape& aFace,
   const TopoDS_Shape& aShell,const TopoDS_Shape &anEdge);
 
-SV_EXPORT_OPENCASCADE TopoDS_Solid OCCTUtils_MakeShell(TopoDS_Shell& shell, const TopoDS_Wire& wire1,
-		const TopoDS_Wire& wire2, const Standard_Real presPln,
-		TopoDS_Face& face1, TopoDS_Face& face);
+SV_EXPORT_OPENCASCADE TopoDS_Solid OCCTUtils_MakeShell(TopoDS_Shell& shell);
 
 SV_EXPORT_OPENCASCADE Standard_Real OCCTUtils_PreciseUpar(const Standard_Real anUpar,
 		const Handle(Geom_BSplineSurface)& aSurface);

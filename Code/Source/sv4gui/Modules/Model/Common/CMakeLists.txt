@@ -56,6 +56,7 @@ simvascular_create_module(
   ${SV_LIB_SOLID_NAME}
   ${SV_LIB_POLYDATA_SOLID_NAME}
   ${SV_LIB_VMTK_UTILS_NAME}
+  ${SV_LIB_VTKSV_UTILS_NAME}
   ${OTHER_OPT_LIBS})
 #-----------------------------------------------------------------------------
 

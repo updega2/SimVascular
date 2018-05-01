@@ -120,6 +120,7 @@ int Geom_CenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   char *usage;
   ARG_List sourceList;
   ARG_List targetList;
+  ARG_List capCenterList;
   char *linesName;
   char *voronoiName;
   char *geomName;
@@ -129,7 +130,7 @@ int Geom_CenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
   RepositoryDataT type;
   int useVmtk = 1;
 
-  int table_size = 6;
+  int table_size = 7;
   ARG_Entry arg_table[] = {
     { "-src", STRING_Type, &geomName, NULL, REQUIRED, 0, { 0 } },
     { "-sourcelist", LIST_Type, &sourceList, NULL, REQUIRED, 0, { 0 } },
@@ -137,6 +138,7 @@ int Geom_CenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
     { "-linesresult", STRING_Type, &linesName, NULL, REQUIRED, 0, { 0 } },
     { "-voronoiresult", STRING_Type, &voronoiName, NULL, REQUIRED, 0, { 0 } },
     { "-usevmtk", INT_Type, &useVmtk, NULL, SV_OPTIONAL, 0, { 0 } },
+    { "-capcenterlist", LIST_Type, &capCenterList, NULL, SV_OPTIONAL, 0, { 0 } },
   };
   usage = ARG_GenSyntaxStr( 1, argv, table_size, arg_table );
   if ( argc == 1 ) {
@@ -189,34 +191,68 @@ int Geom_CenterlinesCmd( ClientData clientData, Tcl_Interp *interp,
 
   int nsources = 0;
   int *sources = new int[sourceList.argc];
-  int ntargets = 0;
-  int *targets = new int[targetList.argc];
 
   if ( ARG_ParseTclListStatic( interp, sourceList, INT_Type, sources, sourceList.argc, &nsources )
        != TCL_OK ) {
     Tcl_SetResult( interp, usage, TCL_VOLATILE );
     ARG_FreeListArgvs( table_size, arg_table );
+
+    delete [] sources;
     return TCL_ERROR;
   }
+
+  int ntargets = 0;
+  int *targets = new int[targetList.argc];
 
   if ( ARG_ParseTclListStatic( interp, targetList, INT_Type, targets, targetList.argc, &ntargets )
        != TCL_OK ) {
     Tcl_SetResult( interp, usage, TCL_VOLATILE );
     ARG_FreeListArgvs( table_size, arg_table );
+
+    delete [] sources;
+    delete [] targets;
     return TCL_ERROR;
+  }
+
+  int ncapcenters = 0;
+  int *capcenters = NULL;
+  if (capCenterList.argc != 0)
+  {
+    capcenters = new int[capCenterList.argc];
+    if ( ARG_ParseTclListStatic( interp, capCenterList, INT_Type, capcenters, capCenterList.argc, &nsources )
+         != TCL_OK ) {
+      Tcl_SetResult( interp, usage, TCL_VOLATILE );
+      ARG_FreeListArgvs( table_size, arg_table );
+
+      delete [] sources;
+      delete [] targets;
+      delete [] capcenters;
+      return TCL_ERROR;
+    }
   }
 
   // Do work of command:
   ARG_FreeListArgvs( table_size, arg_table );
 
-  if ( VMTKUtils_Centerlines( (cvPolyData*)geomSrc, sources, nsources, targets, ntargets, useVmtk, (cvPolyData**)(&linesDst), (cvPolyData**)(&voronoiDst))
+  if ( VMTKUtils_Centerlines( (cvPolyData*)geomSrc, sources, nsources, targets, ntargets, capcenters, ncapcenters, useVmtk, (cvPolyData**)(&linesDst), (cvPolyData**)(&voronoiDst))
        != SV_OK ) {
     Tcl_SetResult( interp, "error creating centerlines", TCL_STATIC );
+
+    delete [] sources;
+    delete [] targets;
+    if (capcenters != NULL)
+    {
+      delete [] capcenters;
+    }
     return TCL_ERROR;
   }
 
   delete [] sources;
   delete [] targets;
+  if (capcenters != NULL)
+  {
+    delete [] capcenters;
+  }
 
   if ( !( gRepository->Register( linesName, linesDst ) ) ) {
     Tcl_AppendResult( interp, "error registering obj ", linesName,

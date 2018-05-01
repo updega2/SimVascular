@@ -101,6 +101,7 @@ public:
     static vtkPolyData* CreateCenterlines(vtkPolyData* inpd,
                                           vtkIdList *sourcePtIds,
                                           vtkIdList *targetPtIds,
+                                          vtkIdList *capCenterPtIds,
                                           int useVmtk);
 
     static vtkPolyData* MergeCenterlines(vtkPolyData* centerlinesPD, int useVmtk);

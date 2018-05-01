@@ -39,8 +39,10 @@
 #include "SimVascular.h"
 #include "cv_sys_geom.h"
 #include "cv_vmtk_utils.h"
+#include "cv_vtksv_utils.h"
 #include "cvPolyData.h"
 #include "cv_polydatasolid_utils.h"
+#include "cv_occtsolid_utils.h"
 
 #include <vtkCellType.h>
 #include <vtkFillHolesFilter.h>
@@ -50,7 +52,42 @@
 #include <vtkThreshold.h>
 #include <vtkDataSetSurfaceFilter.h>
 #include "vtkSVGlobals.h"
+#include "vtkSVIOUtils.h"
 #include "vtkSVNURBSSurface.h"
+
+#include "BRepCheck.hxx"
+#include "BRepCheck_ListOfStatus.hxx"
+#include "BRepCheck_DataMapOfShapeListOfStatus.hxx"
+#include "BRepCheck_Analyzer.hxx"
+#include "BRepCheck_Face.hxx"
+#include "BRepCheck_Shell.hxx"
+#include "BRepCheck_ListOfStatus.hxx"
+#include "BRepCheck_ListIteratorOfListOfStatus.hxx"
+#include "BRepBuilderAPI_MakeEdge.hxx"
+#include "BRepBuilderAPI_MakeVertex.hxx"
+#include "BRepBuilderAPI_MakeWire.hxx"
+#include "BRepGProp.hxx"
+#include "BRep_Builder.hxx"
+#include "BRep_Tool.hxx"
+#include "BRep_TFace.hxx"
+#include "BRepTools_ReShape.hxx"
+#include "BRepExtrema_ExtPC.hxx"
+#include "BRepExtrema_DistShapeShape.hxx"
+#include "BRepLib_FuseEdges.hxx"
+
+#include "TopExp_Explorer.hxx"
+#include "GProp_GProps.hxx"
+
+#include "GeomAPI_ProjectPointOnCurve.hxx"
+#include "GeomConvert_CompCurveToBSplineCurve.hxx"
+
+#include "TopoDS.hxx"
+#include "TopoDS_Edge.hxx"
+#include "TopoDS_Wire.hxx"
+
+#include "ShapeFix_FreeBounds.hxx"
+#include "ShapeFix_Shape.hxx"
+#include "Standard_Real.hxx"
 
 #include "vtkXMLPolyDataWriter.h"
 
@@ -964,31 +1001,6 @@ bool sv4guiModelUtils::DeleteRegions(vtkSmartPointer<vtkPolyData> inpd, std::vec
     return true;
 }
 
-vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement,
-                                                vtkPolyData *mergedCenterlines)
-{
-
-  if(modelElement==NULL || modelElement->GetWholeVtkPolyData()==NULL)
-      return NULL;
-
-  cvPolyData *modelPolyData = new cvPolyData(modelElement->GetWholeVtkPolyData());
-  cvPolyData *mergedPolyData = new cvPolyData(mergedCenterlines);
-  cvPolyData *decomposedPolyData = NULL;
-
-  if ( VMTKUtils_DecomposePolyData(modelPolyData, mergedPolyData, &decomposedPolyData) != SV_OK )
-  {
-    delete modelPolyData;
-    delete mergedPolyData;
-    if (decomposedPolyData != NULL)
-    {
-      delete decomposedPolyData;
-    }
-    return NULL;
-  }
-
-  return decomposedPolyData->GetVtkPolyData();
-}
-
 vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElement,
                                              vtkIdList *sourceCapIds, int useVmtk)
 {
@@ -1032,6 +1044,7 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElemen
 
     vtkSmartPointer<vtkIdList> sourcePtIds = vtkSmartPointer<vtkIdList>::New();
     vtkSmartPointer<vtkIdList> targetPtIds = vtkSmartPointer<vtkIdList>::New();
+    vtkSmartPointer<vtkIdList> capCenterPtIds = vtkSmartPointer<vtkIdList>::New();
 
     int capIdsGiven = 0;
     if (sourceCapIds != NULL)
@@ -1042,9 +1055,13 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElemen
 
     if (!capIdsGiven)
     {
-      sourcePtIds->InsertNextId(capCenterIds[0]);
+      //sourcePtIds->InsertNextId(capCenterIds[0]);
+      sourcePtIds->InsertNextId(0);
       for (int i=1; i<numCapCenterIds; i++)
-        targetPtIds->InsertNextId(capCenterIds[i]);
+      {
+        //targetPtIds->InsertNextId(capCenterIds[i]);
+        targetPtIds->InsertNextId(i);
+      }
     }
     else
     {
@@ -1072,16 +1089,25 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElemen
         int capFaceId = fullpd->GetCellData()->GetArray("ModelFaceID")->GetTuple1(closestCell);
 
         if (sourceCapIds->IsId(capFaceId) != -1)
-          sourcePtIds->InsertNextId(ptId);
+        {
+          //sourcePtIds->InsertNextId(ptId);
+          sourcePtIds->InsertNextId(i);
+        }
         else
-          targetPtIds->InsertNextId(ptId);
+        {
+          //targetPtIds->InsertNextId(ptId);
+          targetPtIds->InsertNextId(i);
+        }
       }
     }
 
+    for (int i=0; i<numCapCenterIds; i++)
+      capCenterPtIds->InsertNextId(capCenterIds[i]);
     delete [] capCenterIds;
 
     vtkPolyData* centerlines=CreateCenterlines(capped->GetVtkPolyData(),
                                                sourcePtIds, targetPtIds,
+                                               capCenterPtIds,
                                                useVmtk);
     delete capped;
 
@@ -1119,15 +1145,23 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd, int useVmtk)
   delete cleaned;
 
   vtkSmartPointer<vtkIdList> sourcePtIds = vtkSmartPointer<vtkIdList>::New();
-  sourcePtIds->InsertNextId(capCenterIds[0]);
+  //sourcePtIds->InsertNextId(capCenterIds[0]);
+  sourcePtIds->InsertNextId(0);
   vtkSmartPointer<vtkIdList> targetPtIds = vtkSmartPointer<vtkIdList>::New();
+  vtkSmartPointer<vtkIdList> capCenterPtIds = vtkSmartPointer<vtkIdList>::New();
   for (int i=1; i<numCapCenterIds; i++)
-    targetPtIds->InsertNextId(capCenterIds[i]);
+  {
+    //targetPtIds->InsertNextId(capCenterIds[i]);
+    targetPtIds->InsertNextId(i);
+  }
 
-  delete [] capCenterIds;
   // capped and got ids
 
-  return CreateCenterlines(capped->GetVtkPolyData(), sourcePtIds, targetPtIds, useVmtk);
+  for (int i=0; i<numCapCenterIds; i++)
+    capCenterPtIds->InsertNextId(capCenterIds[i]);
+  delete [] capCenterIds;
+
+  return CreateCenterlines(capped->GetVtkPolyData(), sourcePtIds, targetPtIds, capCenterPtIds, useVmtk);
 
 }
 
@@ -1135,6 +1169,7 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd, int useVmtk)
 vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd,
                                              vtkIdList *sourcePtIds,
                                              vtkIdList *targetPtIds,
+                                             vtkIdList *capCenterPtIds,
                                              int useVmtk)
 {
     if(inpd==NULL)
@@ -1154,17 +1189,24 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(vtkPolyData* inpd,
     for (int i=0; i<numTargetPts; i++)
       targets[i]=targetPtIds->GetId(i);
 
-    if ( VMTKUtils_Centerlines(src, sources, numSourcePts, targets, numTargetPts, useVmtk, &tempCenterlines, &voronoi) != SV_OK )
+    int numCapCenterPts = capCenterPtIds->GetNumberOfIds();
+    int *capCenters = new int[numCapCenterPts];
+    for (int i=0; i<numCapCenterPts; i++)
+      capCenters[i]=capCenterPtIds->GetId(i);
+
+    if ( VMTKUtils_Centerlines(src, sources, numSourcePts, targets, numTargetPts, capCenters, numCapCenterPts, useVmtk, &tempCenterlines, &voronoi) != SV_OK )
     {
         delete src;
         delete [] sources;
         delete [] targets;
+        delete [] capCenters;
         return NULL;
     }
     delete src;
     delete voronoi;
     delete [] sources;
     delete [] targets;
+    delete [] capCenters;
 
     cvPolyData *centerlines=NULL;
     if ( VMTKUtils_SeparateCenterlines(tempCenterlines, useVmtk, &centerlines) != SV_OK )
@@ -1372,4 +1414,522 @@ bool sv4guiModelUtils::TriangulateSurface(vtkPolyData* pd)
   pd->DeepCopy(triangulator->GetOutput());
 
   return SV_OK;
+}
+
+vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement,
+                                                    vtkPolyData *mergedCenterlines)
+{
+
+  double radius0 = 2.0;
+  double length0 = 2.0;
+  double ctr[3]; ctr[0] = 0.0; ctr[1] = 0.0; ctr[2] = 0.0;
+
+  cvOCCTSolidModel *cylinderSolid = new cvOCCTSolidModel();
+  cylinderSolid->MakeCylinder(dims, ctr);
+
+  TopExp_Explorer thisFaceExp;
+  thisFaceExp.Init(*(boxSolid->geom_),TopAbs_FACE);
+  int faceCount = 0;
+  for (int j=0; thisFaceExp.More(); thisFaceExp.Next(), j++)
+  {
+    faceCount++;
+    TopoDS_Face thisFace = TopoDS::Face(thisFaceExp.Current());
+    BRepCheck_Face faceChecker(thisFace);
+    fprintf(stdout,"INTERSECT WIRES: %d\n", faceChecker.IntersectWires());
+    fprintf(stdout,"CLASSIFY WIRES:  %d\n", faceChecker.ClassifyWires());
+    fprintf(stdout,"ORIENTATION OF WIRES: %d\n", faceChecker.OrientationOfWires());
+    fprintf(stdout,"IS UNORIENTABLE: %d\n", faceChecker.IsUnorientable());
+    fprintf(stdout,"GEOMETRIC CONTROLS: %d\n", faceChecker.GeometricControls());
+  }
+  fprintf(stdout,"NUM FACES: %d\n", faceCount);
+
+  TopExp_Explorer thisEdgeExp;
+  thisEdgeExp.Init(*(boxSolid->geom_),TopAbs_EDGE);
+  TopoDS_Edge firstEdge = TopoDS::Edge(thisEdgeExp.Current());
+  int edgeCount = 0;
+  for (int j=0; thisEdgeExp.More(); thisEdgeExp.Next(), j++)
+  {
+    edgeCount++;
+  }
+  fprintf(stdout,"NUM EDGES: %d\n", edgeCount);
+
+  ////=========================== SOSUDDDDDDDDDDDD =======================0l
+
+  //BRepCheck_ListOfStatus thelist;
+  //BRepCheck_DataMapOfShapeListOfStatus myMap;
+  //fprintf(stdout,"BIND\n");
+  //myMap.Bind(thisFace, thelist);
+  //fprintf(stdout,"MAP LIST\n");
+  //BRepCheck_ListOfStatus& lst = myMap(thisFace);
+
+  //fprintf(stdout,"T FACE\n");
+  //Handle(BRep_TFace)& TF = *((Handle(BRep_TFace)*) &thisFace.TShape());
+  //fprintf(stdout,"CHECK NULL\n");
+  //if (TF->Surface().IsNull()) {
+  //fprintf(stdout,"IS NULL\n");
+  //  BRepCheck::Add(lst,BRepCheck_NoSurface);
+  //fprintf(stdout,"ADD NADA\n");
+  //}
+  //else {
+  //  // Flag natural restriction???
+  //}
+  //if (lst.IsEmpty()) {
+  //fprintf(stdout,"LIST EMPTY\n");
+  //  lst.Append(BRepCheck_NoError);
+  //fprintf(stdout,"APPEND NO ERROR\n");
+  //}
+  fprintf(stdout,"AQUIIII\n");
+
+
+  cvPolyData *wholePd = boxSolid->GetPolyData(0, 20.0);
+
+  return wholePd->GetVtkPolyData();
+
+
+  //if(modelElement==NULL || modelElement->GetWholeVtkPolyData()==NULL)
+  //    return NULL;
+
+  //cvPolyData *modelPolyData = new cvPolyData(modelElement->GetWholeVtkPolyData());
+  //cvPolyData *mergedPolyData = new cvPolyData(mergedCenterlines);
+  //cvPolyData *decomposedPolyData = NULL;
+  //std::vector<cvOCCTSolidModel*> loftedSurfs;
+
+  //if ( VTKSVUtils_DecomposePolyData(modelPolyData, mergedPolyData, &decomposedPolyData, loftedSurfs) != SV_OK )
+  //{
+  //  delete modelPolyData;
+  //  delete mergedPolyData;
+  //  if (decomposedPolyData != NULL)
+  //  {
+  //    delete decomposedPolyData;
+  //  }
+  //  return NULL;
+  //}
+
+  //delete modelPolyData;
+  //delete mergedPolyData;
+
+  //if(loftedSurfs.size()==0)
+  //{
+  //  fprintf(stderr,"No surfs from decomposition\n");
+  //  return NULL;
+  //}
+  //gp_Pnt pt0(1.2062324285507, -5.3187279701233, -76.282005310059);
+  //gp_Pnt pt1(1.1930881738663, 5.764274597168, -76.197998046875);
+  //TopoDS_Vertex vertex0 = BRepBuilderAPI_MakeVertex(pt0);
+  //TopoDS_Vertex vertex1 = BRepBuilderAPI_MakeVertex(pt1);
+
+  //// ============================ TEST SPLIT EDGE IN HAIFF ================
+  //for (int surfer=0; surfer<loftedSurfs.size(); surfer++)
+  //{
+  //  Standard_Real sewtoler =  1.e-6;
+  //  Standard_Real closetoler =  1.e-4;
+  //  ShapeFix_FreeBounds findFree(*(loftedSurfs[surfer]->geom_),sewtoler,closetoler,
+  //            Standard_False,Standard_False);
+  //  TopoDS_Compound freeWires = findFree.GetClosedWires();
+  //  TopExp_Explorer NewEdgeExp;
+  //  NewEdgeExp.Init(freeWires,TopAbs_EDGE);
+  //  for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
+  //  {
+  //    if (surfer == 0)
+  //    {
+  //      if (i != 0)
+  //      {
+  //        continue;
+  //      }
+  //    }
+  //    else
+  //    {
+  //      if (i != 1)
+  //      {
+  //        continue;
+  //      }
+  //    }
+
+
+  //    TopoDS_Edge tmpEdge = TopoDS::Edge(NewEdgeExp.Current());
+  //    GProp_GProps tmpEdgeProps;
+  //    BRepGProp::LinearProperties(tmpEdge,tmpEdgeProps);
+  //    fprintf(stdout,"FULL EDGE PROPS: %.6f\n", tmpEdgeProps.Mass());
+
+  //    TopLoc_Location tmpEdgeLoc;
+  //    Standard_Real tmpEdgeFirst, tmpEdgeLast;
+  //    Handle(Geom_Curve) tmpCurve = BRep_Tool::Curve (tmpEdge, tmpEdgeLoc, tmpEdgeFirst, tmpEdgeLast);
+
+
+  //    // Get closest point on curve
+  //    BRepExtrema_DistShapeShape closestPointFinder0(tmpEdge, vertex0);
+  //    closestPointFinder0.Perform();
+
+  //    fprintf(stdout,"ACTUAL CLOSE POINT 0: %.6f %.6f %.6f\n", closestPointFinder0.PointOnShape1(1).X(), closestPointFinder0.PointOnShape1(1).Y(), closestPointFinder0.PointOnShape1(1).Z());
+
+  //    Standard_Real newParam0;
+  //    closestPointFinder0.ParOnEdgeS1(1, newParam0);
+  //    fprintf(stdout,"ACTUAL CLOSE PARAMETER 0: %.6f\n", newParam0);
+
+  //    BRepExtrema_DistShapeShape closestPointFinder1(tmpEdge, vertex1);
+  //    closestPointFinder1.Perform();
+
+  //    fprintf(stdout,"ACTUAL CLOSE POINT 1: %.6f %.6f %.6f\n", closestPointFinder1.PointOnShape1(1).X(), closestPointFinder1.PointOnShape1(1).Y(), closestPointFinder1.PointOnShape1(1).Z());
+  //    Standard_Real newParam1;
+  //    closestPointFinder1.ParOnEdgeS1(1, newParam1);
+  //    fprintf(stdout,"ACTUAL CLOSE PARAMETER 1: %.6f\n", newParam1);
+
+  //    double midPt = (tmpEdgeLast-tmpEdgeFirst)*0.5;
+
+  //    if (newParam0 > newParam1)
+  //    {
+  //      Standard_Real tmp = newParam1;
+  //      newParam1 = newParam0;
+  //      newParam0 = tmp;
+  //    }
+
+  //    //TopoDS_Edge edge0 = BRepBuilderAPI_MakeEdge(tmpCurve, tmpEdgeFirst, midPt);
+  //    TopoDS_Edge edge0 = BRepBuilderAPI_MakeEdge(tmpCurve, tmpEdgeFirst, newParam0);
+  //    GProp_GProps edge0Props;
+  //    BRepGProp::LinearProperties(edge0,edge0Props);
+  //    fprintf(stdout,"EDGE 0 PROPS: %.6f\n", edge0Props.Mass());
+
+  //    //TopoDS_Edge edge1 = BRepBuilderAPI_MakeEdge(tmpCurve, midPt, tmpEdgeLast);
+  //    TopoDS_Edge edge1 = BRepBuilderAPI_MakeEdge(tmpCurve, newParam0, newParam1);
+  //    GProp_GProps edge1Props;
+  //    BRepGProp::LinearProperties(edge1,edge1Props);
+  //    fprintf(stdout,"EDGE 1 PROPS: %.6f\n", edge1Props.Mass());
+
+  //    TopoDS_Edge edge2 = BRepBuilderAPI_MakeEdge(tmpCurve, newParam1, tmpEdgeLast);
+  //    GProp_GProps edge2Props;
+  //    BRepGProp::LinearProperties(edge2,edge2Props);
+  //    fprintf(stdout,"EDGE 2 PROPS: %.6f\n", edge2Props.Mass());
+
+
+  //    BRepBuilderAPI_MakeWire wiremaker(tmpEdge);
+  //    wiremaker.Build();
+  //    TopoDS_Wire tmpWire = wiremaker.Wire();
+
+  //    // Pull together edges 0 and 2
+  //    BRepBuilderAPI_MakeWire newWiremaker(edge0, edge2);
+  //    newWiremaker.Build();
+  //    TopoDS_Wire halfWire = newWiremaker.Wire();
+
+  //    // Fuse together
+  //    //BRepLib_FuseEdges fuser(halfWire, Standard_False);
+  //    //fprintf(stdout,"NUM POINTS TO BE REMOVERRRED: %d\n", fuser.NbVertices());
+  //    //fuser.Perform();
+  //    //TopoDS_Shape fusedShape = fuser.Shape();
+
+  //    //TopExp_Explorer RealDumbExp;
+  //    //RealDumbExp.Init(fusedShape,TopAbs_EDGE);
+  //    //TopoDS_Edge newestEdge = TopoDS::Edge(RealDumbExp.Current());
+  //    //int numWireEdges = 0;
+  //    //for (int j=0;RealDumbExp.More();RealDumbExp.Next(),j++)
+  //    //{
+  //    //  numWireEdges++;
+  //    //}
+  //    //fprintf(stdout,"SHOUDL BE ONE FUSED EDGE: %d\n", numWireEdges);
+
+
+  //    Handle(Geom_BSplineCurve) curv0BS = OCCTUtils_EdgeToBSpline(edge0);
+  //    Handle(Geom_BSplineCurve) curv2BS = OCCTUtils_EdgeToBSpline(edge2);
+
+  //    Standard_Real aTolV = Precision::Confusion();
+  //    aTolV = 1.e-3;
+  //    GeomConvert_CompCurveToBSplineCurve compBS(curv0BS);
+  //    //Standard_Boolean didWork = compBS.Add(curv2BS, aTolV, Standard_True, Standard_False, 1);
+  //    Standard_Boolean didWork = compBS.Add(curv2BS, aTolV);
+  //    Handle(Geom_BSplineCurve) BS = compBS.BSplineCurve();
+  //    fprintf(stdout,"DID WORK? %d\n", didWork);
+
+  //    BRepBuilderAPI_MakeEdge edgeMaker(BS);
+  //    edgeMaker.Build();
+  //    TopoDS_Edge newestEdge = edgeMaker.Edge();
+
+  //    //BRepBuilderAPI_MakeWire wiremaker(edge0, edge1);
+  //    //wiremaker.Build();
+  //    //TopoDS_Wire new2EdgeWire = wiremaker.Wire();
+  //    BRepBuilderAPI_MakeWire newestWiremaker(edge1, newestEdge);
+  //    newestWiremaker.Build();
+  //    TopoDS_Wire new2EdgeWire = newestWiremaker.Wire();
+
+  //    // ===================== WRITE OUT THE THREE EDGES ===================
+  //    TopLoc_Location edge0Loc, edge1Loc, edge2Loc;
+  //    Standard_Real edge0First, edge0Last, edge1First, edge1Last, edge2First, edge2Last;
+  //    Handle(Geom_Curve) okayCurve0 = BRep_Tool::Curve (newestEdge, edge0Loc, edge0First, edge0Last);
+  //    Handle(Geom_Curve) okayCurve1 = BRep_Tool::Curve (edge1, edge1Loc, edge1First, edge1Last);
+  //    fprintf(stdout,"FIRST AND LAST 0: %.6f %.6f\n", edge0First, edge0Last);
+  //    fprintf(stdout,"FIRST AND LAST 1: %.6f %.6f\n", edge1First, edge1Last);
+
+  //    vtkNew(vtkPoints, okayPoints0);
+  //    vtkNew(vtkPoints, okayPoints1);
+  //    for (int j=0; j<20; j++)
+  //    {
+  //      double val0 = (edge0Last - edge0First)*(j/20.) + edge0First;
+  //      double val1 = (edge1Last - edge1First)*(j/20.) + edge1First;
+  //      gp_Pnt okayPt0 = okayCurve0->Value(val0);
+  //      gp_Pnt okayPt1 = okayCurve1->Value(val1);
+
+  //      okayPoints0->InsertNextPoint(okayPt0.X(), okayPt0.Y(), okayPt0.Z());
+  //      okayPoints1->InsertNextPoint(okayPt1.X(), okayPt1.Y(), okayPt1.Z());
+  //    }
+  //    vtkNew(vtkPolyData, okayPointsPd0);
+  //    okayPointsPd0->SetPoints(okayPoints0);
+  //    vtkNew(vtkPolyData, okayPointsPd1);
+  //    okayPointsPd1->SetPoints(okayPoints1);
+
+  //    std::string fn0 = "/Users/adamupdegrove/Desktop/tmp/USERCURVE"+std::to_string(surfer)+"_0.vtp";
+  //    std::string fn1 = "/Users/adamupdegrove/Desktop/tmp/USERCURVE"+std::to_string(surfer)+"_1.vtp";
+  //    vtkSVIOUtils::WriteVTPFile(fn0, okayPointsPd0);
+  //    vtkSVIOUtils::WriteVTPFile(fn1, okayPointsPd1);
+  //    // ===================== WRITE OUT THE THREE EDGES ===================
+
+  //    // ==============================ANALYZER ================================
+  //    BRepCheck_Analyzer preAnalyzer(*(loftedSurfs[surfer]->geom_), Standard_False);
+  //    fprintf(stdout,"PRE ANALYZER RESULT: %d\n", preAnalyzer.IsValid());
+
+  //    // =======================================================================
+
+  //    //reshaper->Replace(tmpEdge,new2EdgeWire,Standard_False);
+  //    //Standard_Integer shapeStatus = reshaper->Status(tmpEdge,new2EdgeWire,Standard_False);
+  //    //TopoDS_Shape newShape;
+  //    //Standard_Integer shapeStatus = reshaper->Status(*(loftedSurfs[surfer]->geom_),newShape,Standard_False);
+  //    //reshaper->Replace(tmpEdge,edge0,Standard_False);
+  //    //Standard_Integer shapeStatus = reshaper->Status(tmpEdge,edge0,Standard_False);
+  //    //fprintf(stdout,"WHAT IS THE STATUS: %d\n", shapeStatus);
+
+  //    Handle(BRepTools_ReShape) reshaper =  new BRepTools_ReShape();
+  //    reshaper->Replace(tmpEdge,new2EdgeWire,Standard_True);
+  //    TopoDS_Shape newShape = reshaper->Apply(*(loftedSurfs[surfer]->geom_));
+  //    *(loftedSurfs[surfer]->geom_) = newShape;
+
+  //    //TopExp_Explorer faceExp0;
+  //    //faceExp0.Init(*(loftedSurfs[surfer]->geom_), TopAbs_FACE);
+  //    //TopExp_Explorer faceExp1;
+  //    //faceExp1.Init(newShape, TopAbs_FACE);
+
+  //    //TopoDS_Face face0 = TopoDS::Face(faceExp0.Current());
+  //    //TopoDS_Face face1 = TopoDS::Face(faceExp1.Current());
+
+  //    //Handle(BRepTools_ReShape) faceReshaper = new BRepTools_ReShape();
+  //    //faceReshaper->Replace(face1, face0, Standard_True);
+  //    ////*(loftedSurfs[surfer]->geom_) = newShape;
+  //    //*(loftedSurfs[surfer]->geom_) = faceReshaper->Apply(newShape);
+
+  //    BRepCheck_Analyzer postAnalyzer(*(loftedSurfs[surfer]->geom_), Standard_False);
+  //    fprintf(stdout,"POST ANALYZER RESULT: %d\n", postAnalyzer.IsValid());
+
+  //    TopExp_Explorer DumbExp;
+  //    DumbExp.Init(newShape,TopAbs_EDGE);
+  //    int numEdges = 0;
+  //    for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+  //    {
+  //      numEdges++;
+  //    }
+  //    fprintf(stdout,"WAS NEW EDGE ADDED: %d\n", numEdges);
+  //  }
+  //}
+
+  //// =====================================================================
+
+  ////cvOCCTSolidModel* sewSolid=loftedSurfs[0];
+
+  //fprintf(stdout,"SEWING\n");
+  //cvOCCTSolidModel *sewSolid = new cvOCCTSolidModel();
+  //double sewTol = 1.0;
+  //sewSolid->Sew(loftedSurfs, sewTol);
+  //fprintf(stdout,"SEWED\n");
+
+  ////double sewTol = 1.0;
+  ////cvOCCTSolidModel* previousSewSolid=NULL;
+  //////    SolidModel_SimplifyT smp = SM_Simplify_All;
+  ////for(int i=1;i<loftedSurfs.size();i++)
+  ////{
+  ////  previousSewSolid=sewSolid;
+  ////  sewSolid=new cvOCCTSolidModel();
+  ////  if (sewSolid->Sew(loftedSurfs[i],previousSewSolid, sewTol) != SV_OK)
+  ////  {
+  ////    MITK_ERROR << "Failed sewing patches together" << endl;
+  ////    return NULL;
+  ////  }
+  ////}
+
+  //// Check of shell DOESNT WORK
+  ////BRepCheck_Shell shellChecker(TopoDS::Shell(*(sewSolid->geom_)));
+  ////BRepCheck_ListOfStatus status = shellChecker.Status();
+  ////BRepCheck_ListIteratorOfListOfStatus statit;
+  ////statit.Initialize(status);
+  ////for (int j=0; statit.More(); statit.Next(), j++)
+  ////{
+  ////  BRepCheck_Status checker = statit.Value();
+  ////  fprintf(stdout,"WHAT IS SHELL STATUS: %d\n", checker);
+  ////}
+  ////
+  //// LETS TRY TO CREATE SOMETHING OF THIS
+
+  ////TopoDS_Shell shell;
+
+  ////BRep_Builder B;
+  ////fprintf(stdout,"MAKE SHELL\n");
+  ////B.MakeShell(shell);
+
+  //TopExp_Explorer thisFaceExp;
+  //thisFaceExp.Init(*(sewSolid->geom_),TopAbs_FACE);
+  //TopoDS_Face thisFace = TopoDS::Face(thisFaceExp.Current());
+  //int faceCount = 0;
+  //for (int j=0; thisFaceExp.More(); thisFaceExp.Next(), j++)
+  //{
+  //  faceCount++;
+  //}
+  //fprintf(stdout,"NUM FACES: %d\n", faceCount);
+
+  ////BRepCheck_ListOfStatus thelist;
+  ////BRepCheck_DataMapOfShapeListOfStatus myMap;
+  ////fprintf(stdout,"BIND\n");
+  ////myMap.Bind(thisFace, thelist);
+  ////fprintf(stdout,"MAP LIST\n");
+  ////BRepCheck_ListOfStatus& lst = myMap(thisFace);
+
+  ////fprintf(stdout,"T FACE\n");
+  ////Handle(BRep_TFace)& TF = *((Handle(BRep_TFace)*) &thisFace.TShape());
+  ////fprintf(stdout,"CHECK NULL\n");
+  ////if (TF->Surface().IsNull()) {
+  ////fprintf(stdout,"IS NULL\n");
+  ////  BRepCheck::Add(lst,BRepCheck_NoSurface);
+  ////fprintf(stdout,"ADD NADA\n");
+  ////}
+  ////else {
+  ////  // Flag natural restriction???
+  ////}
+  ////if (lst.IsEmpty()) {
+  ////fprintf(stdout,"LIST EMPTY\n");
+  ////  lst.Append(BRepCheck_NoError);
+  ////fprintf(stdout,"APPEND NO ERROR\n");
+  ////}
+  //fprintf(stdout,"AQUIIII\n");
+
+  //BRepCheck_Face faceChecker(thisFace);
+  //fprintf(stdout,"INTERSECT WIRES: %d\n", faceChecker.IntersectWires());
+  //fprintf(stdout,"CLASSIFY WIRES:  %d\n", faceChecker.ClassifyWires());
+  //fprintf(stdout,"ORIENTATION OF WIRES: %d\n", faceChecker.OrientationOfWires());
+  //fprintf(stdout,"IS UNORIENTABLE: %d\n", faceChecker.IsUnorientable());
+  //fprintf(stdout,"GEOMETRIC CONTROLS: %d\n", faceChecker.GeometricControls());
+
+  ////fprintf(stdout,"ADD FACE\n");
+  ////B.Add(shell, thisFace);
+
+  ////Standard_Real thissewtoler =  1.e-6;
+  ////Standard_Real thisclosetoler =  1.e-4;
+  ////ShapeFix_FreeBounds thisfindFree(*(sewSolid->geom_),thissewtoler,thisclosetoler,
+  ////          Standard_False,Standard_False);
+  ////TopoDS_Compound thisfreeWires = thisfindFree.GetClosedWires();
+  ////TopExp_Explorer thisEdgeExp;
+  //////thisEdgeExp.Init(thisfreeWires,TopAbs_WIRE);
+  ////thisEdgeExp.Init(*(sewSolid->geom_),TopAbs_EDGE);
+
+  ////fprintf(stdout,"MAKE WIRE\n");
+  ////TopoDS_Wire wire;
+  ////B.MakeWire(wire);
+
+  ////for (int j=0; thisEdgeExp.More(); thisEdgeExp.Next(), j++)
+  ////{
+  ////  TopoDS_Edge thisEdge = TopoDS::Edge(thisEdgeExp.Current());
+
+  ////  //fprintf(stdout,"MAKE WIRE\n");
+  ////  //B.MakeWire(thisWire);
+  ////  fprintf(stdout,"ADD EDGE\n");
+  ////  B.Add(wire, thisEdge);
+  ////}
+
+  ////fprintf(stdout,"ADD WIRE\n");
+  ////B.Add(thisFace, wire);
+
+  ////fprintf(stdout,"CREATE SHELL\n");
+  ////TopoDS_Shape finalShape = OCCTUtils_MakeShell(shell);
+  ////*(sewSolid->geom_) = finalShape;
+
+  //fprintf(stdout,"GET VTK REP\n");
+  //cvPolyData *wholePd = sewSolid->GetPolyData(0, 20.0);
+
+  //return wholePd->GetVtkPolyData();
+  ////return decomposedPolyData->GetVtkPolyData();
+
+  //////setup face names
+  ////int numFaces;
+  ////int *ids;
+  ////int status=sewSolid->GetFaceIds( &numFaces, &ids);
+  ////if(status != SV_OK )
+  ////{
+  ////    MITK_ERROR << "GetFaceIds: error on object";
+  ////    return NULL;
+  ////}
+
+  ////std::vector<int> faceIDs;
+  ////std::vector<std::string> faceNames;
+  ////for(int i=0;i<numFaces;i++)
+  ////{
+  ////    faceIDs.push_back(ids[i]);
+  ////    char *value=NULL;
+  ////    char *parent=NULL;
+  ////    sewSolid->GetFaceAttribute("gdscName",ids[i],&value);
+  ////    std::string type(value);
+  ////    sewSolid->GetFaceAttribute("parent",ids[i],&parent);
+  ////    std::string groupName(parent);
+  ////    faceNames.push_back(type+"_"+groupName);
+  ////}
+
+  ////for(int i=0;i<faceNames.size()-1;i++)
+  ////{
+  ////    int idx=1;
+  ////    for(int j=i+1;j<faceNames.size();j++)
+  ////    {
+  ////        if(faceNames[i]==faceNames[j])
+  ////        {
+  ////            idx++;
+  ////            std::stringstream ss;
+  ////            ss << idx;
+  ////            std::string idxStr = ss.str();
+  ////            faceNames[j]=faceNames[j]+"_"+idxStr;
+  ////        }
+  ////    }
+  ////}
+
+  ////for(int i=0;i<numFaces;i++)
+  ////{
+  ////    char* fn=const_cast<char*>(faceNames[i].c_str());
+
+  ////    sewSolid->SetFaceAttribute("gdscName",ids[i],fn);
+  ////}
+
+  ////double maxDist = 1.0;
+  ////cvPolyData* cvwholevpd=sewSolid->GetPolyData(0,maxDist);
+  ////if(cvwholevpd==NULL || cvwholevpd->GetVtkPolyData()==NULL)
+  ////    return NULL;
+
+  ////std::vector<sv4guiModelElement::svFace*> faces;
+
+  ////for(int i=0;i<numFaces;i++)
+  ////{
+  ////    cvPolyData* cvfacevpd=sewSolid->GetFacePolyData(ids[i],1,maxDist);
+  ////    if(cvfacevpd==NULL || cvfacevpd->GetVtkPolyData()==NULL)
+  ////        return NULL;
+
+  ////    sv4guiModelElement::svFace* face =new sv4guiModelElement::svFace;
+  ////    face->id=ids[i];
+  ////    face->name=faceNames[i];
+  ////    face->vpd=cvfacevpd->GetVtkPolyData();
+
+  ////    if(face->name.substr(0,5)=="wall_")
+  ////        face->type="wall";
+  ////    else if(face->name.substr(0,4)=="cap_")
+  ////        face->type="cap";
+
+  ////    faces.push_back(face);
+  ////}
+
+  ////sv4guiModelElement* newModelElement=new sv4guiModelElement();
+  //////newModelElement->SetSegNames(segNames);
+  ////newModelElement->SetFaces(faces);
+  ////newModelElement->SetWholeVtkPolyData(cvwholevpd->GetVtkPolyData());
+  //////newModelElement->SetNumSampling(numSamplingPts);
+  ////newModelElement->SetInnerSolid(sewSolid);
+  //////newModelElement->SetMaxDist(maxDist);
+
+  ////return newModelElement;
 }

@@ -54,7 +54,9 @@ set(SV_LIBS
   TETGEN_MESH
   TETGEN_ADAPTOR
   UTILS
-  VMTK_UTILS)
+  VMTK_UTILS
+  VTKSV_UTILS
+  )
 
 # Thirdparty libs
 set(SV_LIBS ${SV_LIBS}

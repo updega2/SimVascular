@@ -63,7 +63,7 @@
 #include "vtkSVCenterlineMerger.h"
 #include "vtkSVCenterlines.h"
 #include "vtkSVFillHolesWithIdsFilter.h"
-#include "vtkSVGroupsSegmenter.h"
+#include "vtkSVVesselNetworkDecomposerAndParameterizer.h"
 
 #include "vtkvmtkPolyDataSurfaceRemeshing.h"
 #include "vtkvmtkPolyDataSizingFunction.h"
@@ -76,7 +76,6 @@
 #include "vtkvmtkPolyDataDistanceToCenterlines.h"
 #include "vtkvmtkPolyDataCenterlines.h"
 #include "vtkvmtkCenterlineBranchExtractor.h"
-#include "vtkvmtkCapPolyData.h"
 #include "vtkvmtkSimpleCapPolyData.h"
 #include "vtkvmtkPolyDataCenterlineGroupsClipper.h"
 #include "vtkvmtkMergeCenterlines.h"
@@ -106,7 +105,7 @@
  */
 
 int VMTKUtils_Centerlines( cvPolyData *polydata,int *sources,int nsources,
-		int *targets,int ntargets, int useVmtk,
+		int *targets,int ntargets, int *capCenters, int ncapCenters, int useVmtk,
 		cvPolyData **lines, cvPolyData **voronoi)
 {
   vtkPolyData *geom = polydata->GetVtkPolyData();
@@ -119,27 +118,36 @@ int VMTKUtils_Centerlines( cvPolyData *polydata,int *sources,int nsources,
 //    vtkSmartPointer<vtkvmtkPolyDataCenterlines>::New();
   vtkSmartPointer<vtkIdList> capInletIds = vtkSmartPointer<vtkIdList>::New();
   vtkSmartPointer<vtkIdList> capOutletIds = vtkSmartPointer<vtkIdList>::New();
+  vtkSmartPointer<vtkIdList> capCenterIds = vtkSmartPointer<vtkIdList>::New();
   int pointId;
 
   fprintf(stderr,"NumSources %d\n",nsources);
   fprintf(stderr,"NumTargets %d\n",ntargets);
   for (pointId = 0;pointId<nsources;pointId++)
   {
-    capInletIds->InsertNextId(*sources+pointId);
+    capInletIds->InsertNextId(sources[pointId]);
   }
   for (pointId = 0;pointId<ntargets;pointId++)
   {
-    capOutletIds->InsertNextId(*targets+pointId);
+    capOutletIds->InsertNextId(targets[pointId]);
+  }
+  for (pointId = 0;pointId<ncapCenters;pointId++)
+  {
+    capCenterIds->InsertNextId(capCenters[pointId]);
   }
 
   if (useVmtk)
   {
     vtkNew(vtkvmtkPolyDataCenterlines,centerLiner);
     try {
-      std::cout<<"Getting Center Lines..."<<endl;
+      std::cout<<"Getting VMTK Centerlines..."<<endl;
       centerLiner->SetInputData(geom);
       centerLiner->SetSourceSeedIds(capInletIds);
       centerLiner->SetTargetSeedIds(capOutletIds);
+      if (capCenters != NULL)
+      {
+        centerLiner->SetCapCenterIds(capCenterIds);
+      }
       centerLiner->SetRadiusArrayName("MaximumInscribedSphereRadius");
       centerLiner->SetCostFunction("1/R");
       centerLiner->SetFlipNormals(0);
@@ -164,16 +172,21 @@ int VMTKUtils_Centerlines( cvPolyData *polydata,int *sources,int nsources,
   {
     vtkNew(vtkSVCenterlines,centerLiner);
     try {
-      std::cout<<"Getting Center Lines..."<<endl;
+      std::cout<<"Getting vtkSV Centerlines..."<<endl;
       centerLiner->SetInputData(geom);
       centerLiner->SetSourceSeedIds(capInletIds);
       centerLiner->SetTargetSeedIds(capOutletIds);
+      if (capCenters != NULL)
+      {
+        centerLiner->SetCapCenterIds(capCenterIds);
+      }
       centerLiner->SetRadiusArrayName("MaximumInscribedSphereRadius");
       centerLiner->SetCostFunction("1/R");
       centerLiner->SetFlipNormals(0);
       centerLiner->SetAppendEndPointsToCenterlines(1);
       centerLiner->SetSimplifyVoronoi(0);
       centerLiner->SetCenterlineResampling(0);
+      centerLiner->DebugOn();
       centerLiner->Update();
 
       result1 = new cvPolyData( centerLiner->GetOutput() );
@@ -355,16 +368,9 @@ int VMTKUtils_SeparateCenterlines( cvPolyData *lines, int useVmtk,
  *  @author UC Berkeley
  *  @author shaddenlab.berkeley.edu
  *
- *  @brief Function to extract centerlines from a vtkPolyData surface
- *  @brief VTMK is called to do this. Each cap on PolyData has an
- *  @brief id and then each id is set as either inlet or outlet.
- *  @param *sources list of source cap ids
- *  @param nsources number of source cap ids
- *  @param *targets list of target cap ids
- *  @param ntargets number of target cap ids
- *  @param **lines returned center lines as vtkPolyData
- *  @param ** voronoi returned voronoi diagram as vtkPolyData
- *  @return SV_OK if the VTMK function executes properly
+ *  @brief
+ *  @param
+ *  @return
  */
 
 int VMTKUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenterlines, cvPolyData **decomposedPolyData)
@@ -374,7 +380,7 @@ int VMTKUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenterl
   cvPolyData *result1 = NULL;
   *decomposedPolyData = NULL;
 
-  vtkNew(vtkSVGroupsSegmenter, decomposer);
+  vtkNew(vtkSVVesselNetworkDecomposerAndParameterizer, decomposer);
   try {
     std::cout<<"Grouping Sections..."<<endl;
     decomposer->SetInputData(geom);
@@ -558,13 +564,58 @@ int VMTKUtils_Cap( cvPolyData *polydata,cvPolyData **cappedpolydata,int *numcent
       capper->SetDisplacement(0);
       capper->SetInPlaneDisplacement(0);
       capper->Update();
-      triangulate->SetInputData(capper->GetOutput());
-      triangulate->Update();
-
-      result = new cvPolyData( triangulate->GetOutput() );
-      *cappedpolydata = result;
+      //triangulate->SetInputData(capper->GetOutput());
+      //triangulate->Update();
+      //
       capCenterIds->DeepCopy(capper->GetCapCenterIds());
 
+      vtkNew(vtkCleanPolyData, cleaner);
+      cleaner->SetInputData(capper->GetOutput());
+      cleaner->Update();
+
+      if (cleaner->GetOutput()->GetNumberOfPoints() != capper->GetOutput()->GetNumberOfPoints() ||
+          cleaner->GetOutput()->GetNumberOfCells() != capper->GetOutput()->GetNumberOfCells())
+      {
+        vtkNew(vtkPolyData, tmpPd);
+        tmpPd->DeepCopy(cleaner->GetOutput());
+        tmpPd->BuildLinks();
+
+        for (int i=0; i<tmpPd->GetNumberOfCells(); i++)
+        {
+          if (tmpPd->GetCellType(i) != VTK_TRIANGLE)
+          {
+            tmpPd->DeleteCell(i);
+          }
+        }
+        tmpPd->RemoveDeletedCells();
+        tmpPd->BuildLinks();
+
+        std::cout << "Cleaner Removed Some Points and Cells, Using Point Locator To Reset Cap Center Ids..." << endl;
+        vtkNew(vtkPointLocator, pointLocator);
+        pointLocator->SetDataSet(tmpPd);
+        pointLocator->BuildLocator();
+
+        int currCapCenterId, newCapCenterId;
+        double pt[3];
+        for (int i=0; i<capCenterIds->GetNumberOfIds(); i++)
+        {
+          currCapCenterId = capCenterIds->GetId(i);
+          capper->GetOutput()->GetPoint(currCapCenterId, pt);
+
+          newCapCenterId = pointLocator->FindClosestPoint(pt);
+          capCenterIds->SetId(i, newCapCenterId);
+        }
+
+        result = new cvPolyData( tmpPd );
+        *cappedpolydata = result;
+
+      }
+      else
+      {
+        result = new cvPolyData( capper->GetOutput() );
+        *cappedpolydata = result;
+        capCenterIds->DeepCopy(capper->GetCapCenterIds());
+      }
     }
 
   }

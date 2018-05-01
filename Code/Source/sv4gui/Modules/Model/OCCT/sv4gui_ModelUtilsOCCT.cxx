@@ -35,6 +35,7 @@
 #include "cv_sys_geom.h"
 #include "cvPolyData.h"
 #include "cv_polydatasolid_utils.h"
+#include "cv_vtksv_utils.h"
 
 #include "vtkSVGlobals.h"
 
@@ -599,5 +600,3 @@ sv4guiModelElementOCCT* sv4guiModelUtilsOCCT::CreateModelElementOCCTByBlend(sv4g
 
     return meocctdst;
 }
-
-

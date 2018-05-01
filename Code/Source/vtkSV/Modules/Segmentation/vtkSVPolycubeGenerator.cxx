@@ -60,6 +60,7 @@ vtkSVPolycubeGenerator::vtkSVPolycubeGenerator()
 {
   this->CenterlineGroupIdsArrayName = NULL;
   this->CenterlineRadiusArrayName   = NULL;
+  this->GridIdsArrayName      = NULL;
   this->CenterlineGraph             = vtkSVCenterlineGraph::New();
 
   this->WorkPd     = vtkPolyData::New();
@@ -86,6 +87,12 @@ vtkSVPolycubeGenerator::~vtkSVPolycubeGenerator()
   {
     delete [] this->CenterlineRadiusArrayName;
     this->CenterlineRadiusArrayName = NULL;
+  }
+
+  if (this->GridIdsArrayName != NULL)
+  {
+    delete [] this->GridIdsArrayName;
+    this->GridIdsArrayName = NULL;
   }
 
   if (this->CenterlineGraph != NULL)
@@ -128,6 +135,7 @@ int vtkSVPolycubeGenerator::RequestData(
   vtkPolyData *output = vtkPolyData::GetData(outputVector);
 
   this->WorkPd->DeepCopy(input);
+  this->WorkPd->BuildLinks();
 
   // Prep work for filter
   if (this->PrepFilter() != SV_OK)
@@ -188,6 +196,13 @@ int vtkSVPolycubeGenerator::PrepFilter()
     return SV_OK;
   }
 
+  if (!this->GridIdsArrayName)
+  {
+    vtkDebugMacro("Grid point ids array name not given, setting to GridIds");
+    this->GridIdsArrayName = new char[strlen("GridIds") + 1];
+    strcpy(this->GridIdsArrayName, "GridIds");
+  }
+
   return SV_OK;
 }
 
@@ -207,6 +222,7 @@ int vtkSVPolycubeGenerator::RunFilter()
     polycubeSize = this->PolycubeUnitLength*this->PolycubeDivisions;
   }
 
+  this->WorkPd->BuildLinks();
   this->CenterlineGraph->SetLines(this->WorkPd);
   this->CenterlineGraph->SetGroupIdsArrayName(this->CenterlineGroupIdsArrayName);
   this->CenterlineGraph->SetCubeSize(polycubeSize);
@@ -406,10 +422,15 @@ int vtkSVPolycubeGenerator::GetVolumePolycube()
 
     vtkNew(vtkIdFilter, ider);
     ider->SetInputData(paraHexMesh);
-    ider->SetIdsArrayName("TmpInternalIds");
+    ider->SetIdsArrayName(this->GridIdsArrayName);
     ider->Update();
 
-    appender->AddInputData(ider->GetOutput());
+    vtkNew(vtkAppendFilter, converter);
+    converter->SetInputData(ider->GetOutput());
+    converter->Update();
+
+    appender->AddInputData(converter->GetOutput());
+    //appender->AddInputData(ider->GetOutput());
   }
   appender->Update();
 

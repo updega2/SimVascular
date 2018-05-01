@@ -52,7 +52,7 @@
 #include "svVMTKUtilsExports.h" // For exports
 
 SV_EXPORT_VMTK_UTILS int VMTKUtils_Centerlines( cvPolyData *polydata, int *source, int nsources,
-                            int *targets, int ntargets, int useVmtk,
+                            int *targets, int ntargets, int *capCenters, int ncapCenters, int useVmtk,
 			    cvPolyData **lines, cvPolyData **voronoi);
 
 SV_EXPORT_VMTK_UTILS int VMTKUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenterlines, cvPolyData **decomposedPolyData);

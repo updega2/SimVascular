@@ -1803,39 +1803,84 @@ void sv4guiModelEdit::ExtractCenterlines()
 
 void sv4guiModelEdit::AdvancedRunDecomp()
 {
-    if (m_ModelType != "PolyData")
-    {
-      QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
-      return;
-    }
+    //if (m_ModelType != "PolyData")
+    //{
+    //  QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
+    //  return;
+    //}
 
-    // Check to make sure merged centerlines exist, complain if not
-    mitk::DataNode::Pointer centerlinesModelNode = this->GetDataStorage()->GetNamedDerivedNode("Full_Centerlines", m_ModelNode);
+    //// Check to make sure merged centerlines exist, complain if not
+    //mitk::DataNode::Pointer centerlinesModelNode = this->GetDataStorage()->GetNamedDerivedNode("Merged_Centerlines", m_ModelNode);
 
-    if (centerlinesModelNode.IsNull())
-    {
-      QMessageBox::warning(m_Parent,"Error","Must first extract centerlines to be able to use this functionality");
-      return;
-    }
+    //if (centerlinesModelNode.IsNull())
+    //{
+    //  QMessageBox::warning(m_Parent,"Error","Must first extract centerlines to be able to use this functionality");
+    //  return;
+    //}
 
-    mitk::Surface::Pointer centerlinesSurface = dynamic_cast<mitk::Surface*>(centerlinesModelNode->GetData());
+    //mitk::Surface::Pointer centerlinesSurface = dynamic_cast<mitk::Surface*>(centerlinesModelNode->GetData());
 
     int timeStep=GetTimeStep();
     sv4guiModelElement* modelElement=m_Model->GetModelElement(timeStep);
 
-    vtkPolyData *decomposedPolyData = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
+    //vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
+    vtkSmartPointer<vtkPolyData> tmpPd = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, tmpPd);
+    //sv4guiModelElement* newModelElement = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
 
-    //// Get centerlines
-    //sv4guiModelExtractPathsAction *extractPathsAction = new sv4guiModelExtractPathsAction();
-    //extractPathsAction->SetDataStorage(this->GetDataStorage());
-    //extractPathsAction->SetFunctionality(this);
-    //extractPathsAction->SetSourceCapIds(capIds);
-    //QList<mitk::DataNode::Pointer> selectedNode;
-    //selectedNode.push_back(m_ModelNode);
+    //if (newModelElement == NULL)
+    //{
+    //  QMessageBox::warning(m_Parent,"Error","Error creating a NURBS surface from model");
+    //  return;
+    //}
 
-    //extractPathsAction->Run(selectedNode);
+    //bool ok=false;
+    //QString newModelName=QInputDialog::getText(m_Parent, "Add OpenCASCADE Model", "Model Name:", QLineEdit::Normal, "", &ok);
 
-    // Now run decomp stuffs
+    //if(!ok)
+    //    return;
+
+    //mitk::DataStorage::SetOfObjects::ConstPointer rs=GetDataStorage()->GetSources (m_ModelNode);
+    //if(rs->size()==0)
+    //    return;
+
+    //mitk::DataNode::Pointer modelFolderNode=rs->GetElement(0);
+
+    //mitk::DataNode::Pointer exitingNode=GetDataStorage()->GetNamedDerivedNode(newModelName.toStdString().c_str(),modelFolderNode);
+    //if(exitingNode){
+    //    QMessageBox::warning(m_Parent,"Model Already Created","Please use a different model name!");
+    //    return;
+    //}
+
+    //sv4guiModel::Pointer solidModel=sv4guiModel::New();
+    //solidModel->SetDataModified();
+    ////solidModel->SetType(newModelElement->GetType());
+    //solidModel->SetType("OpenCASCADE");
+    //solidModel->SetModelElement(newModelElement);
+
+    //mitk::DataNode::Pointer solidModelNode = mitk::DataNode::New();
+    //solidModelNode->SetData(solidModel);
+    //solidModelNode->SetName(newModelName.toStdString());
+
+    //GetDataStorage()->Add(solidModelNode,modelFolderNode);
+
+    // Now add model for decomposedModel
+    mitk::DataNode::Pointer decomposedNode = this->GetDataStorage()->GetNamedDerivedNode("Decomposed_Model", m_ModelNode);
+    mitk::Surface::Pointer decomposedSurface;
+
+    if (decomposedNode.IsNull())
+    {
+      decomposedSurface = mitk::Surface::New();
+
+      decomposedNode = mitk::DataNode::New();
+      decomposedNode->SetData(decomposedSurface);
+      decomposedNode->SetName("Decomposed_Model");
+    }
+    else
+      decomposedSurface = dynamic_cast<mitk::Surface*>(decomposedNode->GetData());
+    decomposedSurface->SetVtkPolyData(outPd, 0);
+
+    this->GetDataStorage()->Add(decomposedNode, m_ModelNode);
 
     return;
 }

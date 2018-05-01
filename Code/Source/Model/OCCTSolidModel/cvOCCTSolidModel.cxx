@@ -568,6 +568,7 @@ int cvOCCTSolidModel::CapSurfToSolid( cvSolidModel *surf)
   }
   this->AddShape();
 
+  fprintf(stdout,"NUM FILLED: %d\n", numFilled);
 
   //Name face as cap for the new surfaces
   int numFaces = 0;
@@ -1734,3 +1735,43 @@ int cvOCCTSolidModel::GetOnlyPD(vtkPolyData *pd,double &max_dist) const
   return SV_OK;
 }
 
+// ------------
+// Sew
+// ------------
+int cvOCCTSolidModel::Sew( std::vector<cvOCCTSolidModel*> modelList, double tolerance)
+{
+  cvOCCTSolidModel *occtPtr;
+
+  if (geom_ != NULL)
+    return SV_ERROR;
+
+  //Need to make sure all are not NULL
+  for (int i=0; i<modelList.size(); i++)
+  {
+    if (modelList[i] == NULL)
+      return SV_ERROR;
+    if (modelList[i]->GetKernelT() != SM_KT_OCCT ) {
+      fprintf(stderr,"Model not of type OCCT\n");
+      return SV_ERROR;
+    }
+  }
+
+  std::vector<TopoDS_Shape> shapeList;
+
+  for (int i=0; i<modelList.size(); i++)
+  {
+    occtPtr = (cvOCCTSolidModel *)( modelList[i] );
+    TopoDS_Shape shape = *(occtPtr->geom_);
+    shapeList.push_back(shape);
+  }
+
+  this->NewShape();
+  if (OCCTUtils_SewShapes(shapeList, tolerance, *geom_) != SV_OK)
+  {
+    fprintf(stderr, "Could not sew shapes\n");
+    return SV_ERROR;
+  }
+  this->AddShape();
+
+  return SV_OK;
+}

@@ -48,7 +48,9 @@ simvascular_create_module(
   ${SV_LIB_POLYDATA_SOLID_NAME}
   ${SV_LIB_THIRDPARTY_VMTK_NAME}
   ${SV_LIB_OpenCASCADE_SOLID_NAME}
-  ${SV_LIB_MODULE_MODEL_NAME})
+  ${SV_LIB_MODULE_MODEL_NAME}
+  ${SV_LIB_VTKSV_UTILS_NAME}
+  )
 #-----------------------------------------------------------------------------
 
 if(SV_INSTALL_LIBS)

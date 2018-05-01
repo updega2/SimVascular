@@ -182,6 +182,7 @@ public:
   int NewShape();
   int AddShape();
   int RemoveShape();
+  int Sew( std::vector<cvOCCTSolidModel*> modelList, double tolerance);
 
   //Function to create OCCT model from knots,mults,cps
   int CreateBSplineSurface(double **CX,double **CY,double **CZ,
@@ -189,9 +190,11 @@ public:
     double *uMults,int &uMlen,double *vMults,int &vMlen,int &p,int &q);
 
   int GetOnlyPD(vtkPolyData *pd,double &max_dist) const;
+
+  // TEMPORARY TO GIVE ACCESS!
+  TopoDS_Shape *geom_;
 protected:
 
-  TopoDS_Shape *geom_;
   TDF_Label *shapelabel_;
   Handle(XCAFDoc_ShapeTool) shapetool_;
 

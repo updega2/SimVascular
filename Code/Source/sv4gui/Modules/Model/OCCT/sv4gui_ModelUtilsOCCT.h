@@ -49,6 +49,7 @@ public:
     static sv4guiModelElementOCCT* CreateModelElementOCCT(std::vector<mitk::DataNode::Pointer> segNodes, int numSamplingPts, svLoftingParam *param, double maxDist = 20.0, unsigned int t = 0);
 
     static sv4guiModelElementOCCT* CreateModelElementOCCTByBlend(sv4guiModelElementOCCT* meocctsrc, std::vector<sv4guiModelElement::svBlendParamRadius*> blendRadii);
+
 };
 
 #endif /* SV4GUI_MODELUTILSOCCT_H */

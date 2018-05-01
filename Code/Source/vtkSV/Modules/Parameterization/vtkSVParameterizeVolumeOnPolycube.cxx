@@ -92,6 +92,7 @@ vtkSVParameterizeVolumeOnPolycube::vtkSVParameterizeVolumeOnPolycube()
   this->FinalHexMesh = vtkUnstructuredGrid::New();
 
   this->GroupIdsArrayName = NULL;
+  this->GridIdsArrayName = NULL;
 }
 
 // ----------------------
@@ -126,6 +127,12 @@ vtkSVParameterizeVolumeOnPolycube::~vtkSVParameterizeVolumeOnPolycube()
     delete [] this->GroupIdsArrayName;
     this->GroupIdsArrayName = NULL;
   }
+
+  if (this->GridIdsArrayName != NULL)
+  {
+    delete [] this->GridIdsArrayName;
+    this->GridIdsArrayName = NULL;
+  }
 }
 
 // ----------------------
@@ -138,7 +145,7 @@ int vtkSVParameterizeVolumeOnPolycube::RequestData(
 {
   // get the input and output
   vtkPolyData *input = vtkPolyData::GetData(inputVector[0]);
-  vtkPolyData *output = vtkPolyData::GetData(outputVector);
+  vtkUnstructuredGrid *output = vtkUnstructuredGrid::GetData(outputVector);
 
   this->WorkPd->DeepCopy(input);
 
@@ -164,6 +171,17 @@ int vtkSVParameterizeVolumeOnPolycube::RequestData(
 
   return SV_OK;
 }
+
+// ----------------------
+// FillInputPortInformation
+// ----------------------
+int vtkSVParameterizeVolumeOnPolycube::FillInputPortInformation(
+    int port, vtkInformation *info)
+{
+  info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkPolyData");
+  return SV_OK;
+}
+
 
 // ----------------------
 // PrepFilter
@@ -206,6 +224,20 @@ int vtkSVParameterizeVolumeOnPolycube::PrepFilter()
     vtkErrorMacro(<< "GroupIdsArray with name specified does not exist on input surface");
     return SV_OK;
   }
+
+  if (!this->GridIdsArrayName)
+  {
+    vtkDebugMacro("Grid point ids array name not given, setting to GridIds");
+    this->GridIdsArrayName = new char[strlen("GridIds") + 1];
+    strcpy(this->GridIdsArrayName, "GridIds");
+  }
+
+  if (vtkSVGeneralUtils::CheckArrayExists(this->PolycubeUg, 0, this->GridIdsArrayName) != SV_OK)
+  {
+    vtkErrorMacro(<< "GridIdsArray with name specified does not exist on volume polycube");
+    return SV_OK;
+  }
+
 
   return SV_OK;
 }
@@ -268,8 +300,8 @@ int vtkSVParameterizeVolumeOnPolycube::RunFilter()
     }
 
     vtkNew(vtkStructuredGrid, branchPolycubeSg);
-    this->ConvertUGToSG(branchPolycubeUg, branchPolycubeSg, whl_divs[1],
-      whl_divs[2], whl_divs[3]);
+    this->ConvertUGToSG(branchPolycubeUg, branchPolycubeSg, this->GridIdsArrayName,
+        whl_divs[1], whl_divs[2], whl_divs[3]);
 
     vtkDebugMacro("WDIV: " << whl_divs[1]);
     vtkDebugMacro("HDIV: " << whl_divs[2]);
@@ -280,7 +312,7 @@ int vtkSVParameterizeVolumeOnPolycube::RunFilter()
 
     vtkNew(vtkIntArray, internalPointIds);
     internalPointIds->SetNumberOfTuples(branchPolycubeSg->GetNumberOfPoints());
-    internalPointIds->SetName("TmpInternalIds");
+    internalPointIds->SetName(this->GridIdsArrayName);
     for (int j=0; j<branchPolycubeSg->GetNumberOfPoints(); j++)
       internalPointIds->SetTuple1(j, j);
     branchPolycubeSg->GetPointData()->AddArray(internalPointIds);
@@ -339,9 +371,9 @@ int vtkSVParameterizeVolumeOnPolycube::RunFilter()
 
   vtkNew(vtkIdFilter, ider2);
   ider2->SetInputData(mappedSurface);
-  ider2->SetIdsArrayName("TmpInternalIds2");
+  ider2->SetIdsArrayName("TmpInternalIds");
   ider2->Update();
-  vtkDataArray *tmpArray = ider2->GetOutput()->GetPointData()->GetArray("TmpInternalIds2");
+  vtkDataArray *tmpArray = ider2->GetOutput()->GetPointData()->GetArray("TmpInternalIds");
   mappedSurface->GetPointData()->AddArray(tmpArray);
 
   vtkNew(vtkAppendFilter, surfaceAppender);
@@ -357,7 +389,13 @@ int vtkSVParameterizeVolumeOnPolycube::RunFilter()
       vtkErrorMacro("Couldn't do the dirt");
       return SV_ERROR;
     }
-    surfaceAppender->AddInputData(mappedBranch);
+
+    vtkNew(vtkAppendFilter, converter);
+    converter->SetInputData(mappedBranch);
+    converter->Update();
+
+    surfaceAppender->AddInputData(converter->GetOutput());
+    //surfaceAppender->AddInputData(mappedBranch);
   }
 
   surfaceAppender->Update();
@@ -392,10 +430,15 @@ int vtkSVParameterizeVolumeOnPolycube::RunFilter()
 
     vtkNew(vtkIdFilter, ider3);
     ider3->SetInputData(realHexMesh);
-    ider3->SetIdsArrayName("TmpInternalIds");
+    ider3->SetIdsArrayName(this->GridIdsArrayName);
     ider3->Update();
 
-    volumeAppender->AddInputData(ider3->GetOutput());
+    vtkNew(vtkAppendFilter, converter);
+    converter->SetInputData(ider3->GetOutput());
+    converter->Update();
+
+    volumeAppender->AddInputData(converter->GetOutput());
+    //volumeAppender->AddInputData(ider3->GetOutput());
   }
 
   volumeAppender->Update();
@@ -440,7 +483,8 @@ int vtkSVParameterizeVolumeOnPolycube::RunFilter()
     vtkSVGeneralUtils::ThresholdUg(mappedVolume, groupId, groupId, 1, this->GroupIdsArrayName, mappedBranch);
 
     vtkNew(vtkStructuredGrid, realHexMesh);
-    if (this->ConvertUGToSG(mappedBranch, realHexMesh, w_divs[i], h_divs[i], l_divs[i]) != SV_OK)
+    if (this->ConvertUGToSG(mappedBranch, realHexMesh, this->GridIdsArrayName,
+        w_divs[i], h_divs[i], l_divs[i]) != SV_OK)
     {
       vtkErrorMacro("Couldn't do the dirt");
       return SV_ERROR;
@@ -448,10 +492,8 @@ int vtkSVParameterizeVolumeOnPolycube::RunFilter()
 
     //// FOR LOFTING OF VOLUME
     //// Set up the volume
-    //vtkNew(vtkUnstructuredGrid, emptyGrid);
     //vtkNew(vtkSVLoftNURBSVolume, lofter);
-    //lofter->SetInputData(emptyGrid);
-    //lofter->SetInputGrid(realHexMesh);
+    //lofter->SetInputData(realHexMesh);
     //lofter->SetUDegree(1);
     //lofter->SetVDegree(1);
     //lofter->SetWDegree(2);
@@ -647,10 +689,11 @@ int vtkSVParameterizeVolumeOnPolycube::RunFilter()
 // ----------------------
 int vtkSVParameterizeVolumeOnPolycube::ConvertUGToSG(vtkUnstructuredGrid *ug,
                                         vtkStructuredGrid *sg,
+                                        std::string pointArrayName,
                                         const int w_div, const int h_div,
                                         const int l_div)
 {
-  vtkDataArray *ptIds = ug->GetPointData()->GetArray("TmpInternalIds");
+  vtkDataArray *ptIds = ug->GetPointData()->GetArray(pointArrayName.c_str());
 
   int dim[3]; dim[0] = w_div; dim[1] = h_div; dim[2] = l_div;
 
@@ -689,500 +732,6 @@ void vtkSVParameterizeVolumeOnPolycube::PrintSelf(ostream& os, vtkIndent indent)
   this->Superclass::PrintSelf(os,indent);
   if (this->GroupIdsArrayName != NULL)
     os << indent << "Group ids array name: " << this->GroupIdsArrayName << "\n";
-}
-
-// ----------------------
-// GetPointEdgeCells
-// ----------------------
-int vtkSVParameterizeVolumeOnPolycube::GetPointEdgeCells(vtkPolyData *pd, std::string arrayName,
-                                                     const int cellId, const int pointId,
-                                                     vtkIdList *sameCells)
-{
-  int sameValue = pd->GetCellData()->GetArray(arrayName.c_str())->GetTuple1(cellId);
-
-  vtkIdType npts, *pts;
-  pd->GetCellPoints(cellId, npts, pts);
-
-  for (int i=0; i<npts; i++)
-  {
-    int ptId0 = pts[i];
-    int ptId1 = pts[(i+1)%npts];
-
-    if (ptId0 == pointId || ptId1 == pointId)
-    {
-      vtkNew(vtkIdList, cellNeighbor);
-      pd->GetCellEdgeNeighbors(cellId, ptId0, ptId1, cellNeighbor);
-
-      for (int j=0; j<cellNeighbor->GetNumberOfIds(); j++)
-      {
-        int cellNeighborId = cellNeighbor->GetId(j);
-        int cellNeighborValue = pd->GetCellData()->GetArray(arrayName.c_str())->GetTuple1(cellNeighborId);
-        if (sameCells->IsId(cellNeighborId) == -1 && cellNeighborValue == sameValue)
-        {
-          sameCells->InsertUniqueId(cellNeighborId);
-          vtkSVParameterizeVolumeOnPolycube::GetPointEdgeCells(pd, arrayName, cellNeighborId, pointId, sameCells);
-        }
-      }
-    }
-  }
-
-  return SV_OK;
-}
-
-
-// ----------------------
-// GetRegions
-// ----------------------
-int vtkSVParameterizeVolumeOnPolycube::GetRegions(vtkPolyData *pd, std::string arrayName,
-                                     std::vector<Region> &allRegions)
-{
-  int numCells = pd->GetNumberOfCells();
-  int numPoints = pd->GetNumberOfPoints();
-
-  std::vector<std::vector<int> > tempRegions(numCells);
-  std::vector<std::vector<int> > directNeighbors(numCells);
-  std::vector<int> numberOfDirectNeighbors(numCells);
-  std::vector<int> pointOnOpenEdge(numPoints, 0);
-
-  for (int i=0; i<numCells; i++)
-  {
-    int directNeiCount = 0;
-    std::vector<int> neighborCells;
-    vtkIdType npts, *pts;
-    pd->GetCellPoints(i, npts, pts);
-    for (int j=0; j<npts; j++)
-    {
-      int ptId0 = pts[j];
-      int ptId1 = pts[(j+1)%npts];
-      vtkNew(vtkIdList, cellEdgeNeighbors);
-      pd->GetCellEdgeNeighbors(i, ptId0, ptId1, cellEdgeNeighbors);
-      directNeiCount += cellEdgeNeighbors->GetNumberOfIds();
-      for (int k=0; k<cellEdgeNeighbors->GetNumberOfIds(); k++)
-        neighborCells.push_back(cellEdgeNeighbors->GetId(k));
-
-      if (cellEdgeNeighbors->GetNumberOfIds() == 0)
-      {
-        pointOnOpenEdge[ptId0] = 1;
-        pointOnOpenEdge[ptId1] = 1;
-      }
-    }
-    directNeighbors[i] = neighborCells;
-    numberOfDirectNeighbors[i] = directNeiCount;
-  }
-
-  for (int i=0; i<numCells; i++)
-  {
-    int regionId = pd->GetCellData()->GetArray(
-      arrayName.c_str())->GetTuple1(i);
-    tempRegions[i].push_back(-1);
-    tempRegions[i].push_back(regionId);
-  }
-
-  int region = 0;
-  for (int i=0; i<numCells; i++)
-  {
-    if (tempRegions[i][0] == -1)
-    {
-      tempRegions[i][0] = region;
-
-      int count=1;
-      std::vector<int> tempIndex;
-      tempIndex.push_back(i);
-
-      for (int j=0; j<count; j++)
-      {
-        for (int k=0; k<numberOfDirectNeighbors[tempIndex[j]]; k++)
-        {
-          int cellId = directNeighbors[tempIndex[j]][k];
-          if (tempRegions[cellId][0] == -1 && tempRegions[i][1] == tempRegions[cellId][1])
-          {
-            tempRegions[cellId][0] = region;
-            tempIndex.push_back(cellId);
-            count++;
-          }
-        }
-      }
-      region++;
-    }
-  }
-
-  int numberOfRegions = region;
-
-  allRegions.clear();
-  allRegions.resize(numberOfRegions);
-
-  for (int i=0; i<numberOfRegions; i++)
-  {
-    allRegions[i].Index = i;
-    allRegions[i].IndexCluster = 0;
-    allRegions[i].NumberOfCorners = 0;
-    allRegions[i].NumberOfElements = 0;
-    allRegions[i].Elements.clear();
-    allRegions[i].CornerPoints.clear();
-    for (int j=0; j<allRegions[i].BoundaryEdges.size(); j++)
-      allRegions[i].BoundaryEdges[j].clear();
-    allRegions[i].BoundaryEdges.clear();
-  }
-
-  for (int i=0; i<numCells; i++)
-  {
-    int regionId = tempRegions[i][0];
-    allRegions[regionId].Elements.push_back(i);
-    allRegions[regionId].NumberOfElements++;
-  }
-
-  for (int i=0; i<numberOfRegions; i++)
-  {
-    int cellId = allRegions[i].Elements[0];
-    allRegions[i].IndexCluster = tempRegions[cellId][1];
-  }
-
-  std::vector<int> cornerPoints;
-  std::vector<int> isCornerPoint(numPoints);
-  std::vector<int> isBoundaryPoint(numPoints);
-  for (int i=0; i<numPoints; i++)
-  {
-    vtkNew(vtkIdList, pointCellsValues);
-    vtkSVGeneralUtils::GetPointCellsValues(pd, arrayName, i, pointCellsValues);
-    if (pointOnOpenEdge[i] == 1)
-      pointCellsValues->InsertNextId(-1);
-    if (pointCellsValues->GetNumberOfIds() >= 3)
-    {
-      cornerPoints.push_back(i);
-      isCornerPoint[i] = 1;
-    }
-    else
-      isCornerPoint[i] = 0;
-
-    if (pointCellsValues->GetNumberOfIds() == 2)
-      isBoundaryPoint[i] = 1;
-    else
-      isBoundaryPoint[i] = 0;
-  }
-
-  int runCount = 0;
-  int numberOfCornerPoints = cornerPoints.size();
-
-  int firstCorner;
-
-  for (int i=0; i<numberOfRegions; i++)
-  {
-    std::vector<int> tempCornerPoints;
-    for (int j=0; j<allRegions[i].NumberOfElements; j++)
-    {
-      int cellId = allRegions[i].Elements[j];
-      vtkIdType npts, *pts;
-      pd->GetCellPoints(cellId, npts, pts);
-      for (int k=0; k<npts; k++)
-      {
-        if (isCornerPoint[pts[k]])
-        {
-          bool kCount = true;
-          for (int kk=0; kk<tempCornerPoints.size(); kk++)
-          {
-            if (pts[k] == tempCornerPoints[kk])
-            {
-              kCount = false;
-            }
-          }
-
-          if (kCount == true)
-          {
-            tempCornerPoints.push_back(pts[k]);
-          }
-        }
-      }
-    }
-
-    allRegions[i].NumberOfCorners = tempCornerPoints.size();
-    //vtkDebugMacro("NUM CORNS: " << allRegions[i].NumberOfCorners << " OF GROUP " <<  allRegions[i].IndexCluster);
-
-
-    vtkNew(vtkIdList, uniqueCornerPoints);
-    if (allRegions[i].NumberOfCorners != 0)
-    {
-      firstCorner = tempCornerPoints[0];
-      allRegions[i].CornerPoints.push_back(firstCorner);
-      uniqueCornerPoints->InsertUniqueId(firstCorner);
-
-      int count=1;
-      std::vector<int> tempNodes;
-      tempNodes.push_back(firstCorner);
-
-      vtkNew(vtkIdList, overrideCells);
-      for (int j=0; j<count; j++)
-      {
-        vtkNew(vtkIdList, pointCells);
-        if (overrideCells->GetNumberOfIds() != 0)
-        {
-          pointCells->DeepCopy(overrideCells);
-          overrideCells->Reset();
-        }
-        else
-        {
-          pd->GetPointCells(tempNodes[j], pointCells);
-        }
-
-        for (int k=0; k<pointCells->GetNumberOfIds(); k++)
-        {
-          int cellId =  pointCells->GetId(k);
-          int pointCCWId = vtkSVParameterizeVolumeOnPolycube::GetCCWPoint(pd, tempNodes[j], cellId);
-          int isBoundaryEdge = vtkSVParameterizeVolumeOnPolycube::CheckBoundaryEdge(pd, arrayName, cellId, tempNodes[j], pointCCWId);
-
-          if (tempRegions[cellId][0] == allRegions[i].Index && isBoundaryPoint[pointCCWId] && isBoundaryEdge)
-          {
-            tempNodes.push_back(pointCCWId);
-            count++;
-            break;
-          }
-          else if (tempRegions[cellId][0] == allRegions[i].Index && isCornerPoint[pointCCWId] && isBoundaryEdge)
-          {
-            if (pointCCWId == firstCorner)
-            {
-              tempNodes.push_back(pointCCWId);
-              allRegions[i].BoundaryEdges.push_back(tempNodes);
-
-              tempNodes.clear();
-
-              if (uniqueCornerPoints->GetNumberOfIds() == allRegions[i].NumberOfCorners)
-              {
-                count = -1;
-                break;
-              }
-              else
-              {
-                for (int ii=0; ii<tempCornerPoints.size(); ii++)
-                {
-                  bool tempCount = false;
-                  int tempIndex  = tempCornerPoints[ii];
-
-                  for (int jj=0; jj<allRegions[i].CornerPoints.size(); jj++)
-                  {
-                    if (tempIndex == allRegions[i].CornerPoints[jj])
-                      tempCount = true;
-                  }
-                  if (tempCount == false)
-                  {
-                    firstCorner = tempIndex;
-                    break;
-                  }
-                }
-                allRegions[i].CornerPoints.push_back(firstCorner);
-                uniqueCornerPoints->InsertUniqueId(firstCorner);
-                tempNodes.push_back(firstCorner);
-                count = 1;
-                j = -1;
-                break;
-              }
-            }
-            else
-            {
-              tempNodes.push_back(pointCCWId);
-              allRegions[i].CornerPoints.push_back(pointCCWId);
-              uniqueCornerPoints->InsertUniqueId(pointCCWId);
-              allRegions[i].BoundaryEdges.push_back(tempNodes);
-
-              tempNodes.clear();
-              tempNodes.push_back(pointCCWId);
-              count = 1;
-              j = -1;
-
-              // Need to cellId to be first in the odd case where the corner point is a two-time corner point
-              vtkNew(vtkIdList, addCells);
-              addCells->InsertNextId(cellId);
-              vtkSVParameterizeVolumeOnPolycube::GetPointEdgeCells(pd, arrayName, cellId, pointCCWId, addCells);
-              for (int ii=0; ii<addCells->GetNumberOfIds(); ii++)
-              {
-                overrideCells->InsertUniqueId(addCells->GetId(ii));
-              }
-
-              vtkNew(vtkIdList, tempCells);
-              pd->GetPointCells(pointCCWId, tempCells);
-
-              for (int ii=0; ii<tempCells->GetNumberOfIds(); ii++)
-              {
-                overrideCells->InsertUniqueId(tempCells->GetId(ii));
-              }
-
-              break;
-            }
-          }
-        }
-      }
-    }
-    if (uniqueCornerPoints->GetNumberOfIds() != allRegions[i].NumberOfCorners)
-    {
-      //vtkErrorMacro("NUM CORNER POINTS DON'T MATCH: " <<  tempCornerPoints.size() << " " << allRegions[i].CornerPoints.size());
-      return SV_ERROR;
-    }
-    allRegions[i].NumberOfCorners = allRegions[i].CornerPoints.size();
-  }
-  //vtkDebugMacro("DONE GETTING REGIONS");
-
-  return SV_OK;
-}
-
-// ----------------------
-// GetCCWPoint
-// ----------------------
-int vtkSVParameterizeVolumeOnPolycube::GetCCWPoint(vtkPolyData *pd, const int pointId, const int cellId)
-{
-	int pointCCW;
-	int position = 0;
-
-  vtkIdType npts, *pts;
-  pd->GetCellPoints(cellId, npts, pts);
-	for (int i = 0; i < npts; i++)
-	{
-		if (pts[i] == pointId)
-		{
-			position = i;
-			break;
-		}
-	}
-
-  position = (position+1)%npts;
-  return pts[position];
-}
-
-// ----------------------
-// GetCWPoint
-// ----------------------
-int vtkSVParameterizeVolumeOnPolycube::GetCWPoint(vtkPolyData *pd, const int pointId, const int cellId)
-{
-	int pointCCW;
-	int position = 0;
-
-  vtkIdType npts, *pts;
-  pd->GetCellPoints(cellId, npts, pts);
-	for (int i = 0; i < npts; i++)
-	{
-		if (pts[i] == pointId)
-		{
-			position = i;
-			break;
-		}
-	}
-
-  position = (position+npts-1)%npts;
-  return pts[position];
-}
-
-// ----------------------
-// CheckBoundaryEdge
-// ----------------------
-int vtkSVParameterizeVolumeOnPolycube::CheckBoundaryEdge(vtkPolyData *pd, std::string arrayName, const int cellId, const int pointId0, const int pointId1)
-{
-  vtkNew(vtkIdList, cellEdgeNeighbors);
-  pd->GetCellEdgeNeighbors(cellId, pointId0, pointId1, cellEdgeNeighbors);
-
-  vtkNew(vtkIdList, uniqueVals);
-  uniqueVals->InsertNextId(pd->GetCellData()->GetArray(arrayName.c_str())->GetTuple1(cellId));
-  for (int i=0; i<cellEdgeNeighbors->GetNumberOfIds(); i++)
-  {
-    uniqueVals->InsertUniqueId(pd->GetCellData()->GetArray(arrayName.c_str())->GetTuple1(cellEdgeNeighbors->GetId(i)));
-  }
-
-  if (cellEdgeNeighbors->GetNumberOfIds() == 0)
-    uniqueVals->InsertUniqueId(-1);
-
-  int isEdge = 0;
-
-  if (uniqueVals->GetNumberOfIds() == 2)
-    isEdge = 1;
-
-  return isEdge;
-}
-
-// ----------------------
-// RotateGroupToGlobalAxis
-// ----------------------
-int vtkSVParameterizeVolumeOnPolycube::RotateGroupToGlobalAxis(vtkPolyData *pd,
-                                                  const int thresholdId,
-                                                  std::string arrayName,
-                                                  vtkPolyData *rotPd,
-                                                  vtkMatrix4x4 *rotMatrix0,
-                                                  vtkMatrix4x4 *rotMatrix1)
-{
-  vtkNew(vtkPolyData, thresholdPd);
-  vtkSVGeneralUtils::ThresholdPd(pd, thresholdId, thresholdId, 1, arrayName, thresholdPd);
-  thresholdPd->BuildLinks();
-
-  vtkIdType f3npts, *f3PtIds;
-  thresholdPd->GetCellPoints(3, f3npts, f3PtIds);
-
-  double pts[3][3];
-  for (int i=0; i<3; i++)
-    thresholdPd->GetPoint(f3PtIds[i], pts[i]);
-
-  double zVec[3], tmpVec[3];
-  vtkMath::Subtract(pts[1], pts[0], zVec);
-  vtkMath::Normalize(zVec);
-  vtkMath::Subtract(pts[1], pts[2], tmpVec);
-  vtkMath::Normalize(tmpVec);
-
-  double yVec[3];
-  vtkMath::Cross(zVec, tmpVec, yVec);
-  vtkMath::Normalize(yVec);
-
-  double realY[3], realZ[3];
-  realY[0] = 0.0; realY[1] = 1.0; realY[2] = 0.0;
-  realZ[0] = 0.0; realZ[1] = 0.0; realZ[2] = 1.0;
-
-  vtkSVGeneralUtils::GetRotationMatrix(yVec, realY, rotMatrix0);
-  double inputZVec[4], newZVec[4];
-  inputZVec[0] = 0.0; inputZVec[1] = 0.0; inputZVec[2] = 0.0; inputZVec[3] = 0.0;
-  newZVec[0] = 0.0; newZVec[1] = 0.0; newZVec[2] = 0.0; newZVec[3] = 0.0;
-  for (int i=0; i<3; i++)
-    inputZVec[i] = zVec[i];
-  inputZVec[3] = 0.0;
-  rotMatrix0->MultiplyPoint(zVec, newZVec);
-
-  vtkSVGeneralUtils::GetRotationMatrix(newZVec, realZ, rotMatrix1);
-
-  vtkNew(vtkCleanPolyData, cleaner);
-  cleaner->SetInputData(pd);
-  cleaner->ToleranceIsAbsoluteOn();
-  cleaner->SetAbsoluteTolerance(1.0e-6);
-  cleaner->Update();
-  rotPd->DeepCopy(cleaner->GetOutput());
-
-  vtkSVGeneralUtils::ApplyRotationMatrix(rotPd, rotMatrix0);
-  vtkSVGeneralUtils::ApplyRotationMatrix(rotPd, rotMatrix1);
-
-  return SV_OK;
-}
-
-
-// ----------------------
-// FindPointMatchingValues
-// ----------------------
-int vtkSVParameterizeVolumeOnPolycube::FindPointMatchingValues(vtkPointSet *ps, std::string arrayName, vtkIdList *matchingVals, int &returnPtId)
-{
-  int closeMatch = -1;
-  for (int i=0; i<ps->GetNumberOfPoints(); i++)
-  {
-    vtkNew(vtkIdList, pointCellValues);
-    vtkSVGeneralUtils::GetPointCellsValues(ps, arrayName, i, pointCellValues);
-    int prevNum = pointCellValues->GetNumberOfIds();
-    pointCellValues->IntersectWith(matchingVals);
-
-    if (pointCellValues->GetNumberOfIds() == matchingVals->GetNumberOfIds() &&
-        prevNum == pointCellValues->GetNumberOfIds())
-    {
-      // We found it!
-      returnPtId = i;
-      return SV_OK;
-    }
-    else if (pointCellValues->GetNumberOfIds() == matchingVals->GetNumberOfIds())
-      closeMatch = i;
-    else if (prevNum == pointCellValues->GetNumberOfIds() && prevNum == 4)
-      closeMatch = i;
-  }
-  if (closeMatch != -1)
-    returnPtId = closeMatch;
-
-  return SV_ERROR;
 }
 
 // ----------------------
@@ -1276,8 +825,17 @@ int vtkSVParameterizeVolumeOnPolycube::MapInteriorBoundary(vtkStructuredGrid *pa
                                               const std::vector<int> ptMap)
 {
   // Now lets try volume
-  vtkDataArray *ptIds = mappedSurface->GetPointData()->GetArray("TmpInternalIds2");
-  vtkDataArray *mappedIds = mappedSurface->GetPointData()->GetArray("TmpInternalIds");
+  vtkDataArray *ptIds = mappedSurface->GetPointData()->GetArray("TmpInternalIds");
+  vtkDataArray *mappedIds = mappedSurface->GetPointData()->GetArray(this->GridIdsArrayName);
+
+  if (ptIds == NULL)
+  {
+    vtkErrorMacro("No TmpInternals2 on mapped surface\n");
+  }
+  if (mappedIds == NULL)
+  {
+    vtkErrorMacro("No TmpInternals on mapped surface\n");
+  }
 
   int dim[3];
   paraHexVolume->GetDimensions(dim);
@@ -1508,7 +1066,7 @@ int vtkSVParameterizeVolumeOnPolycube::MapInteriorBoundary(vtkStructuredGrid *pa
 int vtkSVParameterizeVolumeOnPolycube::FixInteriorBoundary(vtkPolyData *mappedSurface,
                                               const std::vector<std::vector<int> > invPtMap)
 {
-  vtkDataArray *ptIds = mappedSurface->GetPointData()->GetArray("TmpInternalIds2");
+  vtkDataArray *ptIds = mappedSurface->GetPointData()->GetArray("TmpInternalIds");
 
   for (int i=0; i<invPtMap.size(); i++)
   {
@@ -1852,8 +1410,8 @@ int vtkSVParameterizeVolumeOnPolycube::MapVolume(vtkStructuredGrid *paraHexVolum
                                     vtkStructuredGrid *mappedVolume)
 {
   // Now lets try volume
-  vtkDataArray *volumeIds = paraHexVolume->GetPointData()->GetArray("TmpInternalIds");
-  vtkDataArray *mappedIds = mappedSurface->GetPointData()->GetArray("TmpInternalIds");
+  vtkDataArray *volumeIds = paraHexVolume->GetPointData()->GetArray(this->GridIdsArrayName);
+  vtkDataArray *mappedIds = mappedSurface->GetPointData()->GetArray(this->GridIdsArrayName);
 
   int dim[3];
   paraHexVolume->GetDimensions(dim);
