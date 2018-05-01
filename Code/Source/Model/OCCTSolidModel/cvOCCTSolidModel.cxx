@@ -1617,25 +1617,25 @@ int cvOCCTSolidModel::CreateBSplineSurface(double **CX,double **CY,double **CZ,
     surface = new Geom_BSplineSurface(cPoints,uKCol,vKCol,uMCol,vMCol,p,q,uPer,vPer);
     //surface->SetUPeriodic();
     aSurf = surface;
-    //fprintf(stdout,"-----------------BSPLINE PARAMETERS----------------------\n");
-    //fprintf(stdout,"U Degree:             %d\n",surface->UDegree());
-    //fprintf(stdout,"Is U Closed?:         %d\n",surface->IsUClosed());
-    //fprintf(stdout,"Is U Periodic?:       %d\n",surface->IsUPeriodic());
-    //fprintf(stdout,"Is U Rational?:       %d\n",surface->IsURational());
-    //fprintf(stdout,"Nb U Poles:           %d\n",surface->NbUPoles());
-    //fprintf(stdout,"Nb U Knots:           %d\n",surface->NbUKnots());
-    //fprintf(stdout,"First U Knot Index:   %d\n",surface->FirstUKnotIndex());
-    //fprintf(stdout,"Last U Knot Index:    %d\n",surface->LastUKnotIndex());
-    //fprintf(stdout,"_________________________________________________________\n");
-    //fprintf(stdout,"V Degree:             %d\n",surface->VDegree());
-    //fprintf(stdout,"Is V Closed?:         %d\n",surface->IsVClosed());
-    //fprintf(stdout,"Is V Periodic?:       %d\n",surface->IsVPeriodic());
-    //fprintf(stdout,"Is U Rational?:       %d\n",surface->IsVRational());
-    //fprintf(stdout,"Nb V Poles:           %d\n",surface->NbVPoles());
-    //fprintf(stdout,"Nb V Knots:           %d\n",surface->NbVKnots());
-    //fprintf(stdout,"First V Knot Index:   %d\n",surface->FirstVKnotIndex());
-    //fprintf(stdout,"Last V Knot Index:    %d\n",surface->LastVKnotIndex());
-    //fprintf(stdout,"_________________________________________________________\n");
+    fprintf(stdout,"-----------------BSPLINE PARAMETERS----------------------\n");
+    fprintf(stdout,"U Degree:             %d\n",surface->UDegree());
+    fprintf(stdout,"Is U Closed?:         %d\n",surface->IsUClosed());
+    fprintf(stdout,"Is U Periodic?:       %d\n",surface->IsUPeriodic());
+    fprintf(stdout,"Is U Rational?:       %d\n",surface->IsURational());
+    fprintf(stdout,"Nb U Poles:           %d\n",surface->NbUPoles());
+    fprintf(stdout,"Nb U Knots:           %d\n",surface->NbUKnots());
+    fprintf(stdout,"First U Knot Index:   %d\n",surface->FirstUKnotIndex());
+    fprintf(stdout,"Last U Knot Index:    %d\n",surface->LastUKnotIndex());
+    fprintf(stdout,"_________________________________________________________\n");
+    fprintf(stdout,"V Degree:             %d\n",surface->VDegree());
+    fprintf(stdout,"Is V Closed?:         %d\n",surface->IsVClosed());
+    fprintf(stdout,"Is V Periodic?:       %d\n",surface->IsVPeriodic());
+    fprintf(stdout,"Is U Rational?:       %d\n",surface->IsVRational());
+    fprintf(stdout,"Nb V Poles:           %d\n",surface->NbVPoles());
+    fprintf(stdout,"Nb V Knots:           %d\n",surface->NbVKnots());
+    fprintf(stdout,"First V Knot Index:   %d\n",surface->FirstVKnotIndex());
+    fprintf(stdout,"Last V Knot Index:    %d\n",surface->LastVKnotIndex());
+    fprintf(stdout,"_________________________________________________________\n");
   }
   catch (Standard_ConstructionError)
   {
@@ -1667,7 +1667,7 @@ int cvOCCTSolidModel::CreateBSplineSurface(double **CX,double **CY,double **CZ,
   }
 
   Standard_Real pres3d = 1.0e-6;
-  if (OCCTUtils_ShapeFromBSplineSurface(surface,*geom_,wires[0],wires[1],pres3d) != SV_OK)
+  if (OCCTUtils_ShapeFromBSplineSurface(surface,*geom_,wires[0],wires[1]) != SV_OK)
   {
     fprintf(stderr,"Error in conversion from bspline surface to shape\n");
     return SV_ERROR;

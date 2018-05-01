@@ -52,6 +52,8 @@
 #include "cvSolidModel.h"
 #include "cvOCCTSolidModel.h"
 
+#include "TopTools_HSequenceOfShape.hxx"
+#include "BRepCheck_Analyzer.hxx"
 #include "BRepFilletAPI_MakeFillet.hxx"
 #include "BRepBuilderAPI_Sewing.hxx"
 #include "Standard_Real.hxx"
@@ -110,13 +112,40 @@ SV_EXPORT_OPENCASCADE int OCCTUtils_CreateEdgeBlend(TopoDS_Shape &shape,
 
 SV_EXPORT_OPENCASCADE int OCCTUtils_ShapeFromBSplineSurface(const Handle(Geom_BSplineSurface) surface,
     		TopoDS_Shape &shape,
-		const TopoDS_Wire &first_wire, const TopoDS_Wire &last_wire,
-		const int pres3d);
+		const TopoDS_Wire &first_wire, const TopoDS_Wire &last_wire);
+
+SV_EXPORT_OPENCASCADE int OCCTUtils_ShapeFromBSplineSurfaceWithEdges(const Handle(Geom_BSplineSurface) surface,
+    		TopoDS_Shape &shape, std::vector<TopoDS_Edge> edges);
+
+SV_EXPORT_OPENCASCADE int OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(const Handle(Geom_BSplineSurface) surface,
+    		TopoDS_Shape &shape, std::vector<TopoDS_Edge> edges);
 
 SV_EXPORT_OPENCASCADE int OCCTUtils_CapShapeToSolid(TopoDS_Shape &shape,TopoDS_Shape &geom,
     		BRepBuilderAPI_Sewing &attacher,int &numFilled);
 
 SV_EXPORT_OPENCASCADE int OCCTUtils_SewShapes(std::vector<TopoDS_Shape> shapeList, double tolerance, TopoDS_Shape &newShape);
+
+SV_EXPORT_OPENCASCADE void OCCTUtils_GetProblemShapes(const BRepCheck_Analyzer& Ana,
+                      const TopoDS_Shape& Shape,
+                      Handle(TopTools_HSequenceOfShape)& sl,
+                      Handle(TColStd_HArray1OfInteger)& NbProblems,
+                      TopTools_DataMapOfShapeListOfShape &theMap
+                      );
+
+SV_EXPORT_OPENCASCADE void OCCTUtils_GetProblemSub(const BRepCheck_Analyzer& Ana,
+                           const TopoDS_Shape& Shape,
+                           Handle(TopTools_HSequenceOfShape)& sl,
+                           Handle(TColStd_HArray1OfInteger)& NbProblems,
+                           TopTools_DataMapOfShapeListOfShape &theMap,
+                           const TopAbs_ShapeEnum Subtype);
+
+SV_EXPORT_OPENCASCADE void OCCTUtils_FillProblems(const BRepCheck_Status stat,
+                           Handle(TColStd_HArray1OfInteger)& NbProblems);
+
+SV_EXPORT_OPENCASCADE Standard_Boolean OCCTUtils_Contains(const TopTools_ListOfShape& L,
+				 const TopoDS_Shape& S);
+
+SV_EXPORT_OPENCASCADE void OCCTUtils_AnalyzeShape(TopoDS_Shape shape);
 
 /* -------- */
 /* Helpers for loft */

@@ -77,11 +77,13 @@
 #include "BRepLib_FuseEdges.hxx"
 #include "BRepLib_FindSurface.hxx"
 
+#include "TopExp.hxx"
 #include "TopExp_Explorer.hxx"
 #include "GProp_GProps.hxx"
 
 #include "GeomAPI_ProjectPointOnCurve.hxx"
 #include "GeomConvert_CompCurveToBSplineCurve.hxx"
+#include "Geom2d_Line.hxx"
 
 #include "TopoDS.hxx"
 #include "TopoDS_Edge.hxx"
@@ -1434,6 +1436,22 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
   for (int r=0; seeHowMany.More(); seeHowMany.Next(), r++)
   {
     cylEdges++;
+    TopoDS_Edge cylEdge = TopoDS::Edge(seeHowMany.Current());
+
+    TopLoc_Location newLoc;
+    Standard_Real newFirst, newLast;
+    Handle(Geom_Curve) cylCurve = BRep_Tool::Curve (cylEdge, newLoc, newFirst, newLast);
+    vtkSmartPointer<vtkPoints> newPoints = vtkSmartPointer<vtkPoints>::New();
+    for (int k=0; k<20; k++)
+    {
+      double newVal = (newLast-newFirst)*(k/20.) + newFirst;
+      gp_Pnt newPnt = cylCurve->Value(newVal);
+      newPoints->InsertNextPoint(newPnt.X(), newPnt.Y(), newPnt.Z());
+    }
+    vtkSmartPointer<vtkPolyData> newPointsPd = vtkSmartPointer<vtkPolyData>::New();
+    newPointsPd->SetPoints(newPoints);
+    std::string newFn = "/Users/adamupdegrove/Desktop/tmp/CYLEDGES_"+std::to_string(r)+".vtp";
+    vtkSVIOUtils::WriteVTPFile(newFn, newPointsPd);
   }
   fprintf(stdout,"NUM CYL EDEG: %d\n", cylEdges);
 
@@ -1663,7 +1681,7 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
       Handle(BRepTools_ReShape) reshaper =  new BRepTools_ReShape();
       reshaper->Replace(tmpEdge,new2EdgeWire,Standard_True);
       TopoDS_Shape newShape = reshaper->Apply(*(loftedSurfs[surfer]->geom_));
-      *(loftedSurfs[surfer]->geom_) = newShape;
+      //*(loftedSurfs[surfer]->geom_) = newShape;
 
       //// TRY TO MAKE OWN SHAPEEEEE=====================================
       //Handle(BRepTools_ReShape) fullReshaper = new BRepTools_ReShape();
@@ -1684,40 +1702,145 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
 
       BRepBuilderAPI_NurbsConvert nurbs(face0);
       Handle(Geom_Surface) geom_extrusion = BRepLib_FindSurface(nurbs).Surface();
+      Handle(Geom_BSplineSurface) bsplinesurf = Handle(Geom_BSplineSurface)::DownCast(geom_extrusion);
 
-      TopoDS_Face face;
-      builder.MakeFace(face, geom_extrusion, Precision::Confusion());
+      TopExp_Explorer NewWireExp;
+      NewWireExp.Init(freeWires,TopAbs_EDGE);
+      int numWires = 0;
+      std::vector<TopoDS_Wire> allWires;
+      for (int i=0;NewWireExp.More();NewWireExp.Next(),i++)
+      {
+        TopoDS_Edge toBeWireEdge = TopoDS::Edge(NewWireExp.Current());
+        BRepBuilderAPI_MakeWire fWireMaker(toBeWireEdge);
+        fWireMaker.Build();
 
-      TopoDS_Wire NEWWIIRE;
-      builder.MakeWire(NEWWIIRE);
+        allWires.push_back(fWireMaker.Wire());
+        numWires++;
+      }
+      fprintf(stdout,"NUM WIRES: %d\n", numWires);
 
       TopExp_Explorer DumbExp;
-      DumbExp.Init(newShape,TopAbs_EDGE);
-      int numEdges = 0;
+      std::vector<TopoDS_Edge> allEdges;
+      DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
       for (int j=0;DumbExp.More();DumbExp.Next(),j++)
       {
-        TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
-        builder.Add(NEWWIIRE, theNEWEdge);
-        numEdges++;
+        TopoDS_Edge singleEdge = TopoDS::Edge(DumbExp.Current());
+        allEdges.push_back(singleEdge);
       }
-      fprintf(stdout,"WAS NEW EDGE ADDED: %d\n", numEdges);
 
-      builder.Add(face, NEWWIIRE);
-      builder.Add(shell, face);
+      if (surfer == 0)
+      {
+        //OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(bsplinesurf, *(loftedSurfs[surfer]->geom_), allEdges);
+        OCCTUtils_ShapeFromBSplineSurfaceWithEdges(bsplinesurf, *(loftedSurfs[surfer]->geom_), allEdges);
+      }
 
-      *(loftedSurfs[surfer]->geom_) = OCCTUtils_MakeShell(shell);
+
+      //// segmentation of TS
+      //Standard_Real Ui1,Ui2,V0,V1;
+      //Ui1 = 0;
+      //Ui2 = 1;
+      //Ui1 = OCCTUtils_PreciseUpar(Ui1, bsplinesurf);
+      //Ui2 = OCCTUtils_PreciseUpar(Ui2, bsplinesurf);
+      //V0  = bsplinesurf->VKnot(bsplinesurf->FirstVKnotIndex());
+      //V1  = bsplinesurf->VKnot(bsplinesurf->LastVKnotIndex());
+      //bsplinesurf->Segment(Ui1,Ui2,V0,V1);
+
+      //TopoDS_Face face;
+      //builder.MakeFace(face, bsplinesurf, Precision::Confusion());
+
+      //TopoDS_Wire NEWWIIRE;
+      //builder.MakeWire(NEWWIIRE);
+
+      //Standard_Real f1, f2, l1, l2;
+      //geom_extrusion->Bounds(f1,l1,f2,l2);
+      //fprintf(stdout,"WHAT ARE THEY HERE: %.6f %.6f %.6f %.6f\n", f1, l1, f2, l2);
+
+      //TopExp_Explorer DumbExp;
+      //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+      //int numEdges = 0;
+      //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+      //{
+      //  numEdges++;
+      //}
+
+      //std::vector<TopoDS_Edge> allEdges;
+      //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+      //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+      //{
+      //  TopLoc_Location newLoc;
+      //  Standard_Real newFirst, newLast;
+      //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
+      //  Handle(Geom_Curve) NEWCurve = BRep_Tool::Curve (theNEWEdge, newLoc, newFirst, newLast);
+
+      //  TopoDS_Vertex v0, v1;
+      //  TopExp::Vertices(theNEWEdge, v0, v1);
+
+      //  TopoDS_Edge createdEdge;
+      //  builder.MakeEdge(createdEdge, NEWCurve, Precision::Confusion());
+      //  v0.Orientation(TopAbs_FORWARD);
+      //  builder.Add(createdEdge, v0);
+      //  v1.Orientation(TopAbs_REVERSED);
+      //  builder.Add(createdEdge, v1);
+      //  builder.Range(createdEdge, 0, 1);
+      //  allEdges.push_back(createdEdge);
+      //}
+
+      //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+      //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+      //{
+      //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
+      //  builder.Add(NEWWIIRE, allEdges[j]);
+      //}
+
+      //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+      //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+      //{
+      //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
+      //  if (j == 2)
+      //  {
+      //    builder.UpdateEdge(allEdges[j], new Geom2d_Line(gp_Pnt2d(1,0), gp_Dir2d(0,1)),
+      //        face, Precision::Confusion());
+      //  }
+      //  else
+      //  {
+      //    builder.UpdateEdge(allEdges[j], new Geom2d_Line(gp_Pnt2d(0,1), gp_Dir2d(1,0)),
+      //        face, Precision::Confusion());
+      //  }
+      //  builder.Range(allEdges[j], face, 0, 1);
+
+      //}
+      //fprintf(stdout,"WAS NEW EDGE ADDED: %d\n", numEdges);
+
+      //builder.Add(face, NEWWIIRE);
+      //builder.Add(shell, face);
+
+      //*(loftedSurfs[surfer]->geom_) = OCCTUtils_MakeShell(shell);
     }
   }
 
   // =====================================================================
 
-  cvOCCTSolidModel* sewSolid=loftedSurfs[0];
+  //cvOCCTSolidModel* sewSolid=loftedSurfs[0];
 
+  //// CREATE USING SEWING
   //fprintf(stdout,"SEWING\n");
   //cvOCCTSolidModel *sewSolid = new cvOCCTSolidModel();
   //double sewTol = 1.0;
   //sewSolid->Sew(loftedSurfs, sewTol);
   //fprintf(stdout,"SEWED\n");
+
+  // CREATE USING MAKE OF COMPOUND
+
+  cvOCCTSolidModel* sewSolid=loftedSurfs[0];
+  BRep_Builder compoundBuilder;
+  TopoDS_Compound Compound;
+  compoundBuilder.MakeCompound(Compound);
+  for (int surfer=0; surfer<loftedSurfs.size(); surfer++)
+  {
+    compoundBuilder.Add(Compound,*(loftedSurfs[surfer]->geom_));
+  }
+
+  *(sewSolid->geom_) = Compound;
 
   //double sewTol = 1.0;
   //cvOCCTSolidModel* previousSewSolid=NULL;
@@ -1828,7 +1951,8 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
   //*(sewSolid->geom_) = finalShape;
 
   fprintf(stdout,"GET VTK REP\n");
-  cvPolyData *wholePd = sewSolid->GetPolyData(0, 20.0);
+  //cvPolyData *wholePd = sewSolid->GetPolyData(0, 20.0);
+  cvPolyData *wholePd = sewSolid->GetPolyData(1, 5.0);
 
   return wholePd->GetVtkPolyData();
   //return decomposedPolyData->GetVtkPolyData();

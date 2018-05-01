@@ -60,6 +60,7 @@
 #include "BRepOffsetAPI_ThruSections.hxx"
 #include "BRepClass3d_SolidClassifier.hxx"
 #include "BRepTools_ReShape.hxx"
+#include "BRepCheck_Analyzer.hxx"
 #include "BRepCheck_Solid.hxx"
 #include "BRepCheck_ListOfStatus.hxx"
 #include "BRepCheck_ListIteratorOfListOfStatus.hxx"
@@ -68,11 +69,12 @@
 #include "BRepFill_Filling.hxx"
 #include "BRepAdaptor_Curve.hxx"
 #include "BRepBuilderAPI_FindPlane.hxx"
+#include "BRepBuilderAPI_MakeEdge.hxx"
 #include "BRepBuilderAPI_MakeFace.hxx"
 #include "BRepBuilderAPI_MakeShell.hxx"
 #include "BRepBuilderAPI_MakeSolid.hxx"
+#include "BRepBuilderAPI_MakeVertex.hxx"
 #include "BRepBuilderAPI_MakeWire.hxx"
-#include "BRepBuilderAPI_MakeEdge.hxx"
 #include "BRepBuilderAPI_Sewing.hxx"
 #include "BRepFilletAPI_MakeFillet.hxx"
 
@@ -106,6 +108,9 @@
 #include "Geom_Conic.hxx"
 #include "GeomLProp_SLProps.hxx"
 #include "GCPnts_UniformAbscissa.hxx"
+
+#include "vtkSmartPointer.h"
+#include "vtkSVIOUtils.h"
 
 #include <string>
 #include <sstream>
@@ -619,7 +624,7 @@ int OCCTUtils_MakeLoftedSurf(TopoDS_Wire *curves, TopoDS_Shape &shape,
     //fprintf(stdout,"_________________________________________________________\n");
   }
 
-  if (OCCTUtils_ShapeFromBSplineSurface(surface,shape,curves[0],curves[numCurves-1],pres3d) != SV_OK)
+  if (OCCTUtils_ShapeFromBSplineSurface(surface,shape,curves[0],curves[numCurves-1]) != SV_OK)
   {
     fprintf(stderr,"Error in conversion from bspline surface to shape\n");
     return SV_ERROR;
@@ -629,19 +634,497 @@ int OCCTUtils_MakeLoftedSurf(TopoDS_Wire *curves, TopoDS_Shape &shape,
 }
 
 // ---------------------
+// OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges
+// ---------------------
+int OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(const Handle(Geom_BSplineSurface) surface,
+    		TopoDS_Shape &shape, std::vector<TopoDS_Edge> edges)
+{
+  if(surface.IsNull()) {
+    fprintf(stderr,"Lofting did not complete\n");
+    return SV_ERROR;
+  }
+  fprintf(stdout,"IS U PERIODIC? %d\n", surface->IsUPeriodic());
+  fprintf(stdout,"IS V PERIODIC? %d\n", surface->IsVPeriodic());
+
+  // WRITE THE EDGES
+  for (int j=0; j<edges.size(); j++)
+  {
+    TopLoc_Location newLoc;
+    Standard_Real newFirst, newLast;
+    Handle(Geom_Curve) newCurve = BRep_Tool::Curve (edges[j], newLoc, newFirst, newLast);
+    fprintf(stdout,"IS PERIODIC? %d\n", newCurve->IsPeriodic());
+
+    vtkSmartPointer<vtkPoints> newPoints = vtkSmartPointer<vtkPoints>::New();
+    for (int k=0; k<20; k++)
+    {
+      double newVal = (newLast-newFirst)*(k/20.) + newFirst;
+      gp_Pnt newPnt = newCurve->Value(newVal);
+      newPoints->InsertNextPoint(newPnt.X(), newPnt.Y(), newPnt.Z());
+    }
+    vtkSmartPointer<vtkPolyData> newPointsPd = vtkSmartPointer<vtkPolyData>::New();
+    newPointsPd->SetPoints(newPoints);
+    std::string newFn = "/Users/adamupdegrove/Desktop/tmp/REALEDGE_"+std::to_string(j)+".vtp";
+    vtkSVIOUtils::WriteVTPFile(newFn, newPointsPd);
+  }
+
+  int numEdges = edges.size();
+
+  // create the new surface
+  TopoDS_Shell shell;
+  TopoDS_Face face;
+  TopoDS_Wire W;
+  TopoDS_Edge edge, couture;
+  std::vector<TopoDS_Edge> theseEdges(numEdges);
+  std::vector<Handle(Geom_Curve)> theseCurves(numEdges);
+
+  for (int j=0; j<numEdges; j++)
+  {
+    TopLoc_Location newLoc;
+    Standard_Real newFirst, newLast;
+    Handle(Geom_Curve) newCurve = BRep_Tool::Curve (edges[j], newLoc, newFirst, newLast);
+    fprintf(stdout,"NEWFIRST: %.6f, NEWLAST: %.6f\n", newFirst, newLast);
+    theseCurves[j] = newCurve;
+  }
+
+  BRep_Builder builder;
+  builder.MakeShell(shell);
+
+  std::vector<TopoDS_Vertex> vf(numEdges);
+  std::vector<TopoDS_Vertex> vl(numEdges);
+  std::vector<gp_Pnt> vpf(numEdges);
+  std::vector<gp_Pnt> vpl(numEdges);
+
+  for (int j=0; j<numEdges; j++)
+  {
+    TopExp::Vertices(edges[j], vf[j], vl[j]);
+    vpf[j] = BRep_Tool::Pnt(vf[j]);
+    vpl[j] = BRep_Tool::Pnt(vl[j]);
+  }
+
+  fprintf(stdout,"CHECK VERTICES: %.6f %.6f %.6f\n", vpf[0].X(), vpf[0].Y(), vpf[0].Z());
+  fprintf(stdout,"CHECK VERTICES: %.6f %.6f %.6f\n", vpl[0].X(), vpl[0].Y(), vpl[0].Z());
+  fprintf(stdout,"CHECK VERTICES: %.6f %.6f %.6f\n", vpf[1].X(), vpf[1].Y(), vpf[1].Z());
+  fprintf(stdout,"CHECK VERTICES: %.6f %.6f %.6f\n", vpl[1].X(), vpl[1].Y(), vpl[1].Z());
+
+  // make the face
+  builder.MakeFace(face, surface, Precision::Confusion());
+
+  // make the wire
+  builder.MakeWire(W);
+
+  // make the missing edges
+  Standard_Real f1, f2, l1, l2;
+  surface->Bounds(f1,l1,f2,l2);
+  fprintf(stdout,"WHAT ARE THESE: %.6f %.6f %.6f %.6f\n", f1, l1, f2, l2);
+
+  // --- edge 1
+  builder.MakeEdge(theseEdges[0], theseCurves[0], Precision::Confusion());
+  vf[0].Orientation(TopAbs_FORWARD);
+  builder.Add(theseEdges[0], vf[0]);
+  vl[0].Orientation(TopAbs_REVERSED);
+  builder.Add(theseEdges[0], vl[0]);
+  builder.Range(theseEdges[0], 0, 0.5);
+  // processing of looping sections
+  // store edges of the 1st section
+
+  //// --- edge 2
+  builder.MakeEdge(theseEdges[1], theseCurves[1], Precision::Confusion());
+  vf[1].Orientation(TopAbs_FORWARD);
+  builder.Add(theseEdges[1], vf[1]);
+  vl[1].Orientation(TopAbs_REVERSED);
+  builder.Add(theseEdges[1], vl[1]);
+  builder.Range(theseEdges[1], 0.5, 1);
+  // processing of looping sections
+  // store edges of the 1st section
+
+  // --- edge 3
+  builder.MakeEdge(theseEdges[2], theseCurves[2], Precision::Confusion());
+  vf[2].Orientation(TopAbs_FORWARD);
+  builder.Add(theseEdges[2], vf[2]);
+  vl[2].Orientation(TopAbs_REVERSED);
+  builder.Add(theseEdges[2], vl[2]);
+  builder.Range(theseEdges[2], f2, l2);
+  couture = theseEdges[2];
+
+  // --- edge 5
+  theseEdges[4] = couture;
+  theseEdges[4].Reverse();
+
+  // --- edge 4
+  builder.MakeEdge(theseEdges[3], theseCurves[3], Precision::Confusion());
+  vf[3].Orientation(TopAbs_FORWARD);
+  builder.Add(theseEdges[3], vf[3]);
+  vl[3].Orientation(TopAbs_REVERSED);
+  builder.Add(theseEdges[3], vl[3]);
+  builder.Range(theseEdges[3], f1, l1);
+  theseEdges[3].Reverse();
+
+  builder.Add(W,theseEdges[0]);
+  builder.Add(W,theseEdges[1]);
+  builder.Add(W,theseEdges[2]);
+  builder.Add(W,theseEdges[3]);
+  builder.Add(W,theseEdges[4]);
+
+  // set PCurve
+  builder.UpdateEdge(theseEdges[0],new Geom2d_Line(gp_Pnt2d(0,0),gp_Dir2d(1,0)),face,
+    Precision::Confusion());
+  builder.Range(theseEdges[0],face,0,1);
+
+  builder.UpdateEdge(theseEdges[1],new Geom2d_Line(gp_Pnt2d(0.5,1),gp_Dir2d(1,0)),face,
+    Precision::Confusion());
+  builder.Range(theseEdges[1],face,0.5,1);
+
+  builder.UpdateEdge(theseEdges[3],new Geom2d_Line(gp_Pnt2d(0,l2),gp_Dir2d(1,0)),face,
+    Precision::Confusion());
+  builder.Range(theseEdges[3],face,f1,l1);
+
+  builder.UpdateEdge(theseEdges[4],
+    new Geom2d_Line(gp_Pnt2d(l1,0),gp_Dir2d(0,1)),
+    new Geom2d_Line(gp_Pnt2d(f1,0),gp_Dir2d(0,1)),face,
+    Precision::Confusion());
+  builder.Range(theseEdges[4],face,f2,l2);
+
+  //builder.UpdateEdge(edges[0],new Geom2d_Line(gp_Pnt2d(0,f2),gp_Dir2d(1,0)),face,
+  //  Precision::Confusion());
+  //builder.Range(edges[0],face,f1,l1);
+  //builder.UpdateEdge(edges[2],new Geom2d_Line(gp_Pnt2d(0,l2),gp_Dir2d(1,0)),face,
+  //  Precision::Confusion());
+  //builder.Range(edges[2],face,f1,l1);
+
+  //builder.UpdateEdge(edges[1],
+  //  new Geom2d_Line(gp_Pnt2d(l1,0),gp_Dir2d(0,1)),
+  //  new Geom2d_Line(gp_Pnt2d(f1,0),gp_Dir2d(0,1)),face,
+  //  Precision::Confusion());
+  //builder.Range(edges[1],face,f2,l2);
+
+  builder.Add(face,W);
+  builder.Add(shell, face);
+
+  shape = shell;
+  TopoDS_Face first,last;
+  shape = OCCTUtils_MakeShell(shell);
+
+  OCCTUtils_AnalyzeShape(shape);
+
+  return SV_OK;
+}
+
+void OCCTUtils_AnalyzeShape(TopoDS_Shape shape)
+{
+  Handle(TopTools_HSequenceOfShape) sl,slv,sle,slw,slf,sls,slo;
+  sl = new TopTools_HSequenceOfShape();
+  Handle(TColStd_HArray1OfInteger) NbProblems = new
+                              TColStd_HArray1OfInteger(1, 36);
+  for(int i=1; i<=36; i++)
+  {
+    NbProblems->SetValue(i,0);
+  }
+
+  BRepCheck_Analyzer analyzer(shape, Standard_True);
+  TopTools_DataMapOfShapeListOfShape theMap;
+  OCCTUtils_GetProblemShapes(analyzer, shape, sl, NbProblems, theMap);
+
+  Standard_Integer aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidPointOnCurve);
+  if(NbProblems->Value(aProblemID) > 0)
+    std::cout<<"  Invalid Point on Curve ................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidPointOnCurveOnSurface);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Point on CurveOnSurface .......... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidPointOnSurface);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Point on Surface ................. "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_No3DCurve);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  No 3D Curve .............................. "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_Multiple3DCurve);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Multiple 3D Curve ........................ "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_Invalid3DCurve);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid 3D Curve ......................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_NoCurveOnSurface);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  No Curve on Surface ...................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidCurveOnSurface);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Curve on Surface ................. "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidCurveOnClosedSurface);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Curve on closed Surface .......... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidSameRangeFlag);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid SameRange Flag ................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidSameParameterFlag);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid SameParameter Flag ............... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidDegeneratedFlag);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Degenerated Flag ................. "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_FreeEdge);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Free Edge ................................ "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidMultiConnexity);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid MultiConnexity ................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidRange);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Range ............................ "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_EmptyWire);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Empty Wire ............................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_RedundantEdge);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Redundant Edge ........................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_SelfIntersectingWire);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Self Intersecting Wire ................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_NoSurface);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  No Surface ............................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidWire);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Wire ............................. "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_RedundantWire);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Redundant Wire ........................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_IntersectingWires);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Intersecting Wires ....................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidImbricationOfWires);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Imbrication of Wires ............. "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_EmptyShell);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Empty Shell .............................. "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_RedundantFace);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Redundant Face ........................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_UnorientableShape);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Unorientable Shape ....................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_NotClosed);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Not Closed ............................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_NotConnected);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Not Connected ............................ "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_SubshapeNotInShape);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Subshape not in Shape .................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_BadOrientation);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Bad Orientation .......................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_BadOrientationOfSubshape);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Bad Orientation of Subshape .............. "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidToleranceValue);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid tolerance value................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidPolygonOnTriangulation);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid polygon on triangulation.......... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidImbricationOfShells);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Invalid Imbrication of Shells............. "<<NbProblems->Value(aProblemID)<<"\n";
+
+ aProblemID = static_cast<Standard_Integer>(BRepCheck_EnclosedRegion);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  Enclosed Region........................... "<<NbProblems->Value(aProblemID)<<"\n";
+
+  aProblemID = static_cast<Standard_Integer>(BRepCheck_CheckFail);
+  if(NbProblems->Value(aProblemID)>0)
+    std::cout<<"  checkshape failure........................ "<<NbProblems->Value(aProblemID)<<"\n";
+
+}
+// ---------------------
+// OCCTUtils_ShapeFromBSplineSurfaceWithEdge
+// ---------------------
+int OCCTUtils_ShapeFromBSplineSurfaceWithEdges(const Handle(Geom_BSplineSurface) surface,
+    		TopoDS_Shape &shape, std::vector<TopoDS_Edge> edges)
+{
+  if(surface.IsNull()) {
+    fprintf(stderr,"Lofting did not complete\n");
+    return SV_ERROR;
+  }
+
+  // create the new surface
+  TopoDS_Shell shell;
+  TopoDS_Face face;
+  TopoDS_Wire W;
+  TopoDS_Edge edge, couture;
+  std::vector<TopoDS_Edge> theseEdges(4);
+  std::vector<Handle(Geom_Curve)> theseCurves(4);
+
+  for (int j=0; j<4; j++)
+  {
+    TopLoc_Location newLoc;
+    Standard_Real newFirst, newLast;
+    Handle(Geom_Curve) newCurve = BRep_Tool::Curve (edges[j], newLoc, newFirst, newLast);
+    theseCurves[j] = newCurve;
+  }
+
+  BRep_Builder builder;
+  builder.MakeShell(shell);
+
+  TopoDS_Vertex v0f,v0l,v1f,v1l,v2f,v2l,v3f,v3l;
+
+  TopExp::Vertices(edges[0], v0f, v0l);
+  TopExp::Vertices(edges[1], v1f, v1l);
+  TopExp::Vertices(edges[2], v2f, v2l);
+  TopExp::Vertices(edges[3], v3f, v3l);
+
+  // make the face
+  builder.MakeFace(face, surface, Precision::Confusion());
+
+  // make the wire
+  builder.MakeWire(W);
+
+  // make the missing edges
+  Standard_Real f1, f2, l1, l2;
+  surface->Bounds(f1,l1,f2,l2);
+  fprintf(stdout,"WHAT ARE THESE: %.6f %.6f %.6f %.6f\n", f1, l1, f2, l2);
+
+  // --- edge 1
+  //builder.MakeEdge(theseEdges[0], surface->VIso(f2), Precision::Confusion());
+  builder.MakeEdge(theseEdges[0], theseCurves[0], Precision::Confusion());
+  v0f.Orientation(TopAbs_FORWARD);
+  builder.Add(theseEdges[0], v0f);
+  v0l.Orientation(TopAbs_REVERSED);
+  builder.Add(theseEdges[0], v0l);
+  builder.Range(theseEdges[0], f1, l1);
+  // processing of looping sections
+  // store edges of the 1st section
+
+  // --- edge 2
+  //builder.MakeEdge(theseEdges[2], surface->UIso(f1), Precision::Confusion());
+  builder.MakeEdge(theseEdges[1], theseCurves[1], Precision::Confusion());
+  v1f.Orientation(TopAbs_FORWARD);
+  builder.Add(theseEdges[1], v1f);
+  v1l.Orientation(TopAbs_REVERSED);
+  builder.Add(theseEdges[1], v1l);
+  builder.Range(theseEdges[1], f2, l2);
+  couture = theseEdges[1];
+
+  // --- edge 4
+  theseEdges[3] = couture;
+  theseEdges[3].Reverse();
+
+  // --- edge 3
+  //builder.MakeEdge(theseEdges[1], surface->VIso(l2), Precision::Confusion());
+  builder.MakeEdge(theseEdges[2], theseCurves[2], Precision::Confusion());
+  v2f.Orientation(TopAbs_FORWARD);
+  builder.Add(theseEdges[2], v2f);
+  v2l.Orientation(TopAbs_REVERSED);
+  builder.Add(theseEdges[2], v2l);
+  builder.Range(theseEdges[2], f1, l1);
+  theseEdges[2].Reverse();
+
+  builder.Add(W,theseEdges[0]);
+  builder.Add(W,theseEdges[1]);
+  builder.Add(W,theseEdges[2]);
+  builder.Add(W,theseEdges[3]);
+
+  //// WRITE THE EDGES
+  //for (int j=0; j<4; j++)
+  //{
+  //  TopLoc_Location newLoc;
+  //  Standard_Real newFirst, newLast;
+  //  Handle(Geom_Curve) newCurve = BRep_Tool::Curve (theseEdges[j], newLoc, newFirst, newLast);
+
+  //  vtkSmartPointer<vtkPoints> newPoints = vtkSmartPointer<vtkPoints>::New();
+  //  for (int k=0; k<20; k++)
+  //  {
+  //    double newVal = (newLast-newFirst)*(k/20.) + newFirst;
+  //    gp_Pnt newPnt = newCurve->Value(newVal);
+  //    newPoints->InsertNextPoint(newPnt.X(), newPnt.Y(), newPnt.Z());
+  //  }
+  //  vtkSmartPointer<vtkPolyData> newPointsPd = vtkSmartPointer<vtkPolyData>::New();
+  //  newPointsPd->SetPoints(newPoints);
+  //  std::string newFn = "/Users/adamupdegrove/Desktop/tmp/SODUMBPOINTS_"+std::to_string(j)+".vtp";
+  //  vtkSVIOUtils::WriteVTPFile(newFn, newPointsPd);
+  //}
+
+  // set PCurve
+  builder.UpdateEdge(theseEdges[0],new Geom2d_Line(gp_Pnt2d(0,f2),gp_Dir2d(1,0)),face,
+    Precision::Confusion());
+  builder.Range(theseEdges[0],face,f1,l1);
+
+
+  builder.UpdateEdge(theseEdges[2],new Geom2d_Line(gp_Pnt2d(0,l2),gp_Dir2d(1,0)),face,
+    Precision::Confusion());
+  builder.Range(theseEdges[2],face,f1,l1);
+
+  builder.UpdateEdge(theseEdges[3],
+    new Geom2d_Line(gp_Pnt2d(l1,0),gp_Dir2d(0,1)),
+    new Geom2d_Line(gp_Pnt2d(f1,0),gp_Dir2d(0,1)),face,
+    Precision::Confusion());
+  builder.Range(theseEdges[3],face,f2,l2);
+
+  //builder.UpdateEdge(edges[0],new Geom2d_Line(gp_Pnt2d(0,f2),gp_Dir2d(1,0)),face,
+  //  Precision::Confusion());
+  //builder.Range(edges[0],face,f1,l1);
+  //builder.UpdateEdge(edges[2],new Geom2d_Line(gp_Pnt2d(0,l2),gp_Dir2d(1,0)),face,
+  //  Precision::Confusion());
+  //builder.Range(edges[2],face,f1,l1);
+
+  //builder.UpdateEdge(edges[1],
+  //  new Geom2d_Line(gp_Pnt2d(l1,0),gp_Dir2d(0,1)),
+  //  new Geom2d_Line(gp_Pnt2d(f1,0),gp_Dir2d(0,1)),face,
+  //  Precision::Confusion());
+  //builder.Range(edges[1],face,f2,l2);
+
+  builder.Add(face,W);
+  builder.Add(shell, face);
+
+  shape = shell;
+  TopoDS_Face first,last;
+  shape = OCCTUtils_MakeShell(shell);
+
+  OCCTUtils_AnalyzeShape(shape);
+
+  return SV_OK;
+}
+
+// ---------------------
 // OCCTUtils_ShapeFromBSplineSurface
 // ---------------------
 int OCCTUtils_ShapeFromBSplineSurface(const Handle(Geom_BSplineSurface) surface,
     		TopoDS_Shape &shape,const TopoDS_Wire &first_wire,
-		const TopoDS_Wire &last_wire,
-		const int pres3d)
+		const TopoDS_Wire &last_wire)
 {
-  gp_Pnt tmpPoint = surface->Pole(1,1);
-  tmpPoint.SetX(tmpPoint.X()+10.0);
-  tmpPoint.SetY(tmpPoint.Y()+10.0);
-  tmpPoint.SetZ(tmpPoint.Z()+10.0);
-  //surface->SetPole(1,1,tmpPoint);
-
   if(surface.IsNull()) {
     fprintf(stderr,"Lofting did not complete\n");
     return SV_ERROR;
@@ -652,10 +1135,9 @@ int OCCTUtils_ShapeFromBSplineSurface(const Handle(Geom_BSplineSurface) surface,
   TopoDS_Face face;
   TopoDS_Wire W;
   TopoDS_Edge edge, edge1, edge2, edge3, edge4, couture;
-  TopTools_Array1OfShape vcouture(1, 1);
 
-  BRep_Builder B;
-  B.MakeShell(shell);
+  BRep_Builder builder;
+  builder.MakeShell(shell);
 
   TopoDS_Wire newW1, newW2;
   BRep_Builder BW1, BW2;
@@ -694,81 +1176,81 @@ int OCCTUtils_ShapeFromBSplineSurface(const Handle(Geom_BSplineSurface) surface,
     TopExp::Vertices(edge,v2l,v2f);
 
   // make the face
-  B.MakeFace(face, surface, Precision::Confusion());
+  builder.MakeFace(face, surface, Precision::Confusion());
 
   // make the wire
-  B.MakeWire(W);
+  builder.MakeWire(W);
 
   // make the missing edges
   Standard_Real f1, f2, l1, l2;
   surface->Bounds(f1,l1,f2,l2);
+  fprintf(stdout,"WHAT ARE THESE: %.6f %.6f %.6f %.6f\n", f1, l1, f2, l2);
 
   // --- edge 1
-  B.MakeEdge(edge1, surface->VIso(f2), Precision::Confusion());
+  builder.MakeEdge(edge1, surface->VIso(f2), Precision::Confusion());
   v1f.Orientation(TopAbs_FORWARD);
-  B.Add(edge1, v1f);
+  builder.Add(edge1, v1f);
   v1l.Orientation(TopAbs_REVERSED);
-  B.Add(edge1, v1l);
-  B.Range(edge1, f1, l1);
+  builder.Add(edge1, v1l);
+  builder.Range(edge1, f1, l1);
   // processing of looping sections
   // store edges of the 1st section
 
   // --- edge 2
-  B.MakeEdge(edge2, surface->VIso(l2), Precision::Confusion());
+  builder.MakeEdge(edge2, surface->VIso(l2), Precision::Confusion());
   v2f.Orientation(TopAbs_FORWARD);
-  B.Add(edge2, v2f);
+  builder.Add(edge2, v2f);
   v2l.Orientation(TopAbs_REVERSED);
-  B.Add(edge2, v2l);
-  B.Range(edge2, f1, l1);
+  builder.Add(edge2, v2l);
+  builder.Range(edge2, f1, l1);
   edge2.Reverse();
 
-
   // --- edge 3
-  B.MakeEdge(edge3, surface->UIso(f1), Precision::Confusion());
+  builder.MakeEdge(edge3, surface->UIso(f1), Precision::Confusion());
   v1f.Orientation(TopAbs_FORWARD);
-  B.Add(edge3, v1f);
+  builder.Add(edge3, v1f);
   v2f.Orientation(TopAbs_REVERSED);
-  B.Add(edge3, v2f);
-  B.Range(edge3, f2, l2);
+  builder.Add(edge3, v2f);
+  builder.Range(edge3, f2, l2);
   couture = edge3;
   edge3.Reverse();
 
   // --- edge 4
   edge4 = couture;
 
-  B.Add(W,edge1);
-  B.Add(W,edge4);
-  B.Add(W,edge2);
-  B.Add(W,edge3);
+  builder.Add(W,edge1);
+  builder.Add(W,edge4);
+  builder.Add(W,edge2);
+  builder.Add(W,edge3);
 
   // set PCurve
-  B.UpdateEdge(edge1,new Geom2d_Line(gp_Pnt2d(0,f2),gp_Dir2d(1,0)),face,
+  builder.UpdateEdge(edge1,new Geom2d_Line(gp_Pnt2d(0,f2),gp_Dir2d(1,0)),face,
     Precision::Confusion());
-  B.Range(edge1,face,f1,l1);
-  B.UpdateEdge(edge2,new Geom2d_Line(gp_Pnt2d(0,l2),gp_Dir2d(1,0)),face,
+  builder.Range(edge1,face,f1,l1);
+  builder.UpdateEdge(edge2,new Geom2d_Line(gp_Pnt2d(0,l2),gp_Dir2d(1,0)),face,
     Precision::Confusion());
-  B.Range(edge2,face,f1,l1);
+  builder.Range(edge2,face,f1,l1);
 
-  B.UpdateEdge(edge3,
+  builder.UpdateEdge(edge3,
     new Geom2d_Line(gp_Pnt2d(l1,0),gp_Dir2d(0,1)),
     new Geom2d_Line(gp_Pnt2d(f1,0),gp_Dir2d(0,1)),face,
     Precision::Confusion());
-  B.Range(edge3,face,f2,l2);
+  builder.Range(edge3,face,f2,l2);
 
-  B.Add(face,W);
-  B.Add(shell, face);
+  builder.Add(face,W);
+  builder.Add(shell, face);
 
-  // complete newW1 newW2
-  TopoDS_Edge edge12 = edge1;
-  TopoDS_Edge edge22 = edge2;
-  edge12.Reverse();
-  edge22.Reverse();
-  BW1.Add(newW1, edge12);
-  BW2.Add(newW2, edge22);
+  //// complete newW1 newW2
+  //TopoDS_Edge edge12 = edge1;
+  //TopoDS_Edge edge22 = edge2;
+  //edge12.Reverse();
+  //edge22.Reverse();
+  //BW1.Add(newW1, edge12);
+  //BW2.Add(newW2, edge22);
 
-  // history
-  TopTools_DataMapOfShapeShape generated;
-  generated.Bind(firstEdge, face);
+  //// history
+  //TopTools_DataMapOfShapeShape generated;
+  //generated.Bind(firstEdge, face);
 
   shape = shell;
   TopoDS_Face first,last;
@@ -1620,4 +2102,134 @@ int OCCTUtils_SewShapes(std::vector<TopoDS_Shape> shapeList, double tolerance, T
   newShape = solidmaker.Solid();
 
   return SV_OK;
+}
+
+void OCCTUtils_GetProblemShapes(const BRepCheck_Analyzer& Ana,
+                      const TopoDS_Shape& Shape,
+                      Handle(TopTools_HSequenceOfShape)& sl,
+                      Handle(TColStd_HArray1OfInteger)& NbProblems,
+                      TopTools_DataMapOfShapeListOfShape &theMap
+                      )
+{
+  for (TopoDS_Iterator iter(Shape); iter.More(); iter.Next())
+  {
+    OCCTUtils_GetProblemShapes(Ana,iter.Value(),sl, NbProblems, theMap);
+  }
+  TopAbs_ShapeEnum styp = Shape.ShapeType();
+  BRepCheck_ListIteratorOfListOfStatus itl;
+  if (!Ana.Result(Shape).IsNull() && !theMap.IsBound(Shape))
+  {
+    itl.Initialize(Ana.Result(Shape)->Status());
+
+    if (itl.Value() != BRepCheck_NoError)
+    {
+      sl->Append(Shape);
+      OCCTUtils_FillProblems(itl.Value(),NbProblems);
+    }
+  }
+  if (!theMap.IsBound(Shape))
+  {
+    TopTools_ListOfShape thelist;
+    theMap.Bind(Shape, thelist);
+  }
+
+  switch (styp) {
+  case TopAbs_EDGE:
+    OCCTUtils_GetProblemSub(Ana, Shape, sl, NbProblems, theMap, TopAbs_VERTEX);
+    break;
+  case TopAbs_FACE:
+    OCCTUtils_GetProblemSub(Ana, Shape, sl, NbProblems, theMap, TopAbs_WIRE);
+    OCCTUtils_GetProblemSub(Ana, Shape, sl, NbProblems, theMap, TopAbs_EDGE);
+    OCCTUtils_GetProblemSub(Ana, Shape, sl, NbProblems, theMap, TopAbs_VERTEX);
+    break;
+  case TopAbs_SHELL:
+    break;
+  case TopAbs_SOLID:
+    OCCTUtils_GetProblemSub(Ana, Shape, sl, NbProblems, theMap, TopAbs_SHELL);
+    break;
+  default:
+    break;
+  }
+}
+
+void OCCTUtils_GetProblemSub(const BRepCheck_Analyzer& Ana,
+                   const TopoDS_Shape& Shape,
+                   Handle(TopTools_HSequenceOfShape)& sl,
+                   Handle(TColStd_HArray1OfInteger)& NbProblems,
+                   TopTools_DataMapOfShapeListOfShape &theMap,
+                   const TopAbs_ShapeEnum Subtype)
+{
+  BRepCheck_ListIteratorOfListOfStatus itl;
+  TopExp_Explorer exp;
+  for (exp.Init(Shape,Subtype); exp.More(); exp.Next()) {
+    const Handle(BRepCheck_Result)& res = Ana.Result(exp.Current());
+
+    const TopoDS_Shape& sub = exp.Current();
+    for (res->InitContextIterator(); res->MoreShapeInContext(); res->NextShapeInContext())
+    {
+      if (res->ContextualShape().IsSame(Shape) && !OCCTUtils_Contains(theMap(sub),Shape))
+      {
+        theMap(sub).Append(Shape);
+
+        itl.Initialize(res->StatusOnShape());
+
+        if (itl.Value() != BRepCheck_NoError)
+        {
+          Standard_Integer ii = 0;
+
+          for(ii=1; ii<=sl->Length(); ii++)
+          {
+            if(sl->Value(ii).IsSame(sub))
+            {
+              break;
+            }
+          }
+
+          if(ii>sl->Length())
+          {
+            sl->Append(sub);
+            OCCTUtils_FillProblems(itl.Value(),NbProblems);
+          }
+          for(ii=1; ii<=sl->Length(); ii++)
+          {
+            if(sl->Value(ii).IsSame(Shape))
+            {
+              break;
+            }
+          }
+          if(ii>sl->Length())
+          {
+            sl->Append(Shape);
+            OCCTUtils_FillProblems(itl.Value(),NbProblems);
+          }
+        }
+        break;
+      }
+    }
+  }
+}
+
+void OCCTUtils_FillProblems(const BRepCheck_Status stat,
+                            Handle(TColStd_HArray1OfInteger)& NbProblems)
+{
+
+  const Standard_Integer anID = static_cast<Standard_Integer> (stat);
+
+  if((NbProblems->Upper() < anID) || (NbProblems->Lower() > anID))
+    return;
+
+  NbProblems->SetValue(anID, NbProblems->Value(anID)+1);
+
+}
+
+Standard_Boolean OCCTUtils_Contains(const TopTools_ListOfShape& L,
+				 const TopoDS_Shape& S)
+{
+  TopTools_ListIteratorOfListOfShape it;
+  for (it.Initialize(L); it.More(); it.Next()) {
+    if (it.Value().IsSame(S)) {
+      return Standard_True;
+    }
+  }
+  return Standard_False;
 }
