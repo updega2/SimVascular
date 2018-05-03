@@ -1803,29 +1803,29 @@ void sv4guiModelEdit::ExtractCenterlines()
 
 void sv4guiModelEdit::AdvancedRunDecomp()
 {
-    if (m_ModelType != "PolyData")
-    {
-      QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
-      return;
-    }
+    //if (m_ModelType != "PolyData")
+    //{
+    //  QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
+    //  return;
+    //}
 
-    // Check to make sure merged centerlines exist, complain if not
-    mitk::DataNode::Pointer centerlinesModelNode = this->GetDataStorage()->GetNamedDerivedNode("Merged_Centerlines", m_ModelNode);
+    //// Check to make sure merged centerlines exist, complain if not
+    //mitk::DataNode::Pointer centerlinesModelNode = this->GetDataStorage()->GetNamedDerivedNode("Merged_Centerlines", m_ModelNode);
 
-    if (centerlinesModelNode.IsNull())
-    {
-      QMessageBox::warning(m_Parent,"Error","Must first extract centerlines to be able to use this functionality");
-      return;
-    }
+    //if (centerlinesModelNode.IsNull())
+    //{
+    //  QMessageBox::warning(m_Parent,"Error","Must first extract centerlines to be able to use this functionality");
+    //  return;
+    //}
 
-    mitk::Surface::Pointer centerlinesSurface = dynamic_cast<mitk::Surface*>(centerlinesModelNode->GetData());
+    //mitk::Surface::Pointer centerlinesSurface = dynamic_cast<mitk::Surface*>(centerlinesModelNode->GetData());
 
     int timeStep=GetTimeStep();
     sv4guiModelElement* modelElement=m_Model->GetModelElement(timeStep);
 
-    vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
-    //vtkSmartPointer<vtkPolyData> tmpPd = vtkSmartPointer<vtkPolyData>::New();
-    //vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, tmpPd);
+    //vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
+    vtkSmartPointer<vtkPolyData> tmpPd = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, tmpPd);
 
     //sv4guiModelElement* newModelElement = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
 

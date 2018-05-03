@@ -1497,18 +1497,31 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
 
   cvOCCTSolidModel *cylinderSolid = new cvOCCTSolidModel();
   double radius = 2.0;
-  double length = 2.0;
+  double length = 8.0;
   double ctr[3]; ctr[0] = 0.0; ctr[1] = 0.0; ctr[2] = 0.0;
   double axis[3]; axis[0] = 0.0; axis[1] = 0.0; axis[2] = 1.0;
   cylinderSolid->MakeCylinder(radius, length, ctr, axis);
 
-  TopExp_Explorer seeHowMany;
-  seeHowMany.Init(*(cylinderSolid->geom_), TopAbs_EDGE);
+
+  TopExp_Explorer edgeExp;
+  edgeExp.Init(*(cylinderSolid->geom_), TopAbs_EDGE);
+
+  //edgeExp.Next();
+  //edgeExp.Next();
+  //edgeExp.Next();
+  //edgeExp.Next();
+  //TopoDS_Edge removeEdge = TopoDS::Edge(edgeExp.Current());
+  //Handle(BRepTools_ReShape) remover = new BRepTools_ReShape();
+  //remover->Remove(removeEdge);
+  //TopoDS_Shape newShape = remover->Apply(*(cylinderSolid->geom_));
+  //*(cylinderSolid->geom_) = newShape;
+
+  edgeExp.Init(*(cylinderSolid->geom_), TopAbs_EDGE);
   int cylEdges = 0;
-  for (int r=0; seeHowMany.More(); seeHowMany.Next(), r++)
+  for (int r=0; edgeExp.More(); edgeExp.Next(), r++)
   {
     cylEdges++;
-    TopoDS_Edge cylEdge = TopoDS::Edge(seeHowMany.Current());
+    TopoDS_Edge cylEdge = TopoDS::Edge(edgeExp.Current());
 
     TopLoc_Location newLoc;
     Standard_Real newFirst, newLast;
@@ -1525,562 +1538,564 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
     std::string newFn = "/Users/adamupdegrove/Desktop/tmp/CYLEDGES_"+std::to_string(r)+".vtp";
     vtkSVIOUtils::WriteVTPFile(newFn, newPointsPd);
   }
-  fprintf(stdout,"NUM CYL EDEG: %d\n", cylEdges);
+  fprintf(stdout,"NUM CYL EDGE: %d\n", cylEdges);
+  OCCTUtils_AnalyzeShape(*(cylinderSolid->geom_));
 
-  ////=========================== SOSUDDDDDDDDDDDD =======================0l
+  cvPolyData *cylPd = cylinderSolid->GetPolyData(1, 1.0);
+  return cylPd->GetVtkPolyData();
 
-  if(modelElement==NULL || modelElement->GetWholeVtkPolyData()==NULL)
-      return NULL;
+  //////=========================== SOSUDDDDDDDDDDDD =======================0l
 
-  cvPolyData *modelPolyData = new cvPolyData(modelElement->GetWholeVtkPolyData());
-  cvPolyData *mergedPolyData = new cvPolyData(mergedCenterlines);
-  cvPolyData *decomposedPolyData = NULL;
-  std::vector<cvOCCTSolidModel*> loftedSurfs;
-
-  if ( VTKSVUtils_DecomposePolyData(modelPolyData, mergedPolyData, &decomposedPolyData, loftedSurfs) != SV_OK )
-  {
-    delete modelPolyData;
-    delete mergedPolyData;
-    if (decomposedPolyData != NULL)
-    {
-      delete decomposedPolyData;
-    }
-    return NULL;
-  }
-
-  delete modelPolyData;
-  delete mergedPolyData;
-
-  if(loftedSurfs.size()==0)
-  {
-    fprintf(stderr,"No surfs from decomposition\n");
-    return NULL;
-  }
-  gp_Pnt pt0(1.2062324285507, -5.3187279701233, -76.282005310059);
-  gp_Pnt pt1(1.1930881738663, 5.764274597168, -76.197998046875);
-  TopoDS_Vertex vertex0 = BRepBuilderAPI_MakeVertex(pt0);
-  TopoDS_Vertex vertex1 = BRepBuilderAPI_MakeVertex(pt1);
-
-  // ============================ TEST SPLIT EDGE IN HAIFF ================
-  for (int surfer=0; surfer<loftedSurfs.size(); surfer++)
-  {
-    Standard_Real sewtoler =  1.e-6;
-    Standard_Real closetoler =  1.e-4;
-    ShapeFix_FreeBounds findFree(*(loftedSurfs[surfer]->geom_),sewtoler,closetoler,
-              Standard_False,Standard_False);
-    TopoDS_Compound freeWires = findFree.GetClosedWires();
-    TopExp_Explorer NewEdgeExp;
-    NewEdgeExp.Init(freeWires,TopAbs_EDGE);
-    for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
-    {
-      //if (surfer == 0)
-      //{
-        if (i != 0)
-        {
-          continue;
-        }
-      //}
-      //else
-      //{
-      //  if (i != 1)
-      //  {
-      //    continue;
-      //  }
-      //}
-
-
-      TopoDS_Edge tmpEdge = TopoDS::Edge(NewEdgeExp.Current());
-      GProp_GProps tmpEdgeProps;
-      BRepGProp::LinearProperties(tmpEdge,tmpEdgeProps);
-      fprintf(stdout,"FULL EDGE PROPS: %.6f\n", tmpEdgeProps.Mass());
-
-      TopLoc_Location tmpEdgeLoc;
-      Standard_Real tmpEdgeFirst, tmpEdgeLast;
-      Handle(Geom_Curve) tmpCurve = BRep_Tool::Curve (tmpEdge, tmpEdgeLoc, tmpEdgeFirst, tmpEdgeLast);
-
-
-      // Get closest point on curve
-      BRepExtrema_DistShapeShape closestPointFinder0(tmpEdge, vertex0);
-      closestPointFinder0.Perform();
-
-      fprintf(stdout,"ACTUAL CLOSE POINT 0: %.6f %.6f %.6f\n", closestPointFinder0.PointOnShape1(1).X(), closestPointFinder0.PointOnShape1(1).Y(), closestPointFinder0.PointOnShape1(1).Z());
-
-      Standard_Real newParam0;
-      closestPointFinder0.ParOnEdgeS1(1, newParam0);
-      fprintf(stdout,"ACTUAL CLOSE PARAMETER 0: %.6f\n", newParam0);
-
-      BRepExtrema_DistShapeShape closestPointFinder1(tmpEdge, vertex1);
-      closestPointFinder1.Perform();
-
-      fprintf(stdout,"ACTUAL CLOSE POINT 1: %.6f %.6f %.6f\n", closestPointFinder1.PointOnShape1(1).X(), closestPointFinder1.PointOnShape1(1).Y(), closestPointFinder1.PointOnShape1(1).Z());
-      Standard_Real newParam1;
-      closestPointFinder1.ParOnEdgeS1(1, newParam1);
-      fprintf(stdout,"ACTUAL CLOSE PARAMETER 1: %.6f\n", newParam1);
-
-      double midPt = (tmpEdgeLast-tmpEdgeFirst)*0.5;
-
-      if (newParam0 > newParam1)
-      {
-        Standard_Real tmp = newParam1;
-        newParam1 = newParam0;
-        newParam0 = tmp;
-      }
-
-      //TopoDS_Edge edge0 = BRepBuilderAPI_MakeEdge(tmpCurve, tmpEdgeFirst, midPt);
-      //TopoDS_Edge edge0 = BRepBuilderAPI_MakeEdge(tmpCurve, tmpEdgeFirst, newParam0);
-      TopoDS_Edge edge0 = BRepBuilderAPI_MakeEdge(tmpCurve, 0.0, 0.5);
-      GProp_GProps edge0Props;
-      BRepGProp::LinearProperties(edge0,edge0Props);
-      fprintf(stdout,"EDGE 0 PROPS: %.6f\n", edge0Props.Mass());
-
-      //TopoDS_Edge edge1 = BRepBuilderAPI_MakeEdge(tmpCurve, midPt, tmpEdgeLast);
-      //TopoDS_Edge edge1 = BRepBuilderAPI_MakeEdge(tmpCurve, newParam0, newParam1);
-      TopoDS_Edge edge1 = BRepBuilderAPI_MakeEdge(tmpCurve, 0.5, 1.0);
-      GProp_GProps edge1Props;
-      BRepGProp::LinearProperties(edge1,edge1Props);
-      fprintf(stdout,"EDGE 1 PROPS: %.6f\n", edge1Props.Mass());
-
-      //TopoDS_Edge edge2 = BRepBuilderAPI_MakeEdge(tmpCurve, newParam1, tmpEdgeLast);
-      TopoDS_Edge edge2 = BRepBuilderAPI_MakeEdge(tmpCurve, 0.25, 0.5);
-      GProp_GProps edge2Props;
-      BRepGProp::LinearProperties(edge2,edge2Props);
-      fprintf(stdout,"EDGE 2 PROPS: %.6f\n", edge2Props.Mass());
-
-      // Pull together edges 0 and 2
-      BRepBuilderAPI_MakeWire newWiremaker(edge0, edge2);
-      newWiremaker.Build();
-      TopoDS_Wire halfWire = newWiremaker.Wire();
-
-
-
-      //// Fuse together
-      //BRepLib_FuseEdges fuser(halfWire, Standard_False);
-      //fprintf(stdout,"NUM POINTS TO BE REMOVERRRED: %d\n", fuser.NbVertices());
-      //fuser.Perform();
-      //TopoDS_Shape fusedShape = fuser.Shape();
-
-      //TopExp_Explorer RealDumbExp;
-      //RealDumbExp.Init(fusedShape,TopAbs_EDGE);
-      //TopoDS_Edge newestEdge = TopoDS::Edge(RealDumbExp.Current());
-      //int numWireEdges = 0;
-      //for (int j=0;RealDumbExp.More();RealDumbExp.Next(),j++)
-      //{
-      //  numWireEdges++;
-      //}
-      //fprintf(stdout,"SHOUDL BE ONE FUSED EDGE: %d\n", numWireEdges);
-
-      //Handle(Geom_BSplineCurve) curv0BS = OCCTUtils_EdgeToBSpline(edge0);
-      //Handle(Geom_BSplineCurve) curv2BS = OCCTUtils_EdgeToBSpline(edge2);
-
-      //Standard_Real aTolV = Precision::Confusion();
-      //aTolV = 1.e-3;
-      //GeomConvert_CompCurveToBSplineCurve compBS(curv0BS);
-      ////Standard_Boolean didWork = compBS.Add(curv2BS, aTolV, Standard_True, Standard_False, 1);
-      //Standard_Boolean didWork = compBS.Add(curv2BS, aTolV);
-      //Handle(Geom_BSplineCurve) BS = compBS.BSplineCurve();
-      //fprintf(stdout,"DID WORK? %d\n", didWork);
-
-      //BRepBuilderAPI_MakeEdge edgeMaker(BS);
-      //edgeMaker.Build();
-      //TopoDS_Edge newestEdge = edgeMaker.Edge();
-
-      //TopExp_Explorer RealDumbExp;
-      //RealDumbExp.Init(newestEdge,TopAbs_EDGE);
-      //int numWireEdges = 0;
-      //for (int j=0;RealDumbExp.More();RealDumbExp.Next(),j++)
-      //{
-      //  numWireEdges++;
-      //}
-      //fprintf(stdout,"SHOUDL BE ONE FUSED EDGE: %d\n", numWireEdges);
-
-      //BRepBuilderAPI_MakeWire wiremaker(edge0, edge1);
-      //wiremaker.Build();
-      //TopoDS_Wire new2EdgeWire = wiremaker.Wire();
-      //BRepBuilderAPI_MakeWire newestWiremaker(edge1, newestEdge);
-      BRepBuilderAPI_MakeWire newestWiremaker(edge0, edge1);
-      newestWiremaker.Build();
-      TopoDS_Wire new2EdgeWire = newestWiremaker.Wire();
-
-      //// ===================== WRITE OUT THE THREE EDGES ===================
-      //TopLoc_Location edge0Loc, edge1Loc, edge2Loc;
-      //Standard_Real edge0First, edge0Last, edge1First, edge1Last, edge2First, edge2Last;
-      //Handle(Geom_Curve) okayCurve0 = BRep_Tool::Curve (newestEdge, edge0Loc, edge0First, edge0Last);
-      //Handle(Geom_Curve) okayCurve1 = BRep_Tool::Curve (edge1, edge1Loc, edge1First, edge1Last);
-      //fprintf(stdout,"FIRST AND LAST 0: %.6f %.6f\n", edge0First, edge0Last);
-      //fprintf(stdout,"FIRST AND LAST 1: %.6f %.6f\n", edge1First, edge1Last);
-
-      //vtkNew(vtkPoints, okayPoints0);
-      //vtkNew(vtkPoints, okayPoints1);
-      //for (int j=0; j<20; j++)
-      //{
-      //  double val0 = (edge0Last - edge0First)*(j/20.) + edge0First;
-      //  double val1 = (edge1Last - edge1First)*(j/20.) + edge1First;
-      //  gp_Pnt okayPt0 = okayCurve0->Value(val0);
-      //  gp_Pnt okayPt1 = okayCurve1->Value(val1);
-
-      //  okayPoints0->InsertNextPoint(okayPt0.X(), okayPt0.Y(), okayPt0.Z());
-      //  okayPoints1->InsertNextPoint(okayPt1.X(), okayPt1.Y(), okayPt1.Z());
-      //}
-      //vtkNew(vtkPolyData, okayPointsPd0);
-      //okayPointsPd0->SetPoints(okayPoints0);
-      //vtkNew(vtkPolyData, okayPointsPd1);
-      //okayPointsPd1->SetPoints(okayPoints1);
-
-      //std::string fn0 = "/Users/adamupdegrove/Desktop/tmp/USERCURVE"+std::to_string(surfer)+"_0.vtp";
-      //std::string fn1 = "/Users/adamupdegrove/Desktop/tmp/USERCURVE"+std::to_string(surfer)+"_1.vtp";
-      //vtkSVIOUtils::WriteVTPFile(fn0, okayPointsPd0);
-      //vtkSVIOUtils::WriteVTPFile(fn1, okayPointsPd1);
-      //// ===================== WRITE OUT THE THREE EDGES ===================
-
-      // ==============================ANALYZER ================================
-      BRepCheck_Analyzer preAnalyzer(*(loftedSurfs[surfer]->geom_), Standard_False);
-      fprintf(stdout,"PRE ANALYZER RESULT: %d\n", preAnalyzer.IsValid());
-
-      // =======================================================================
-
-      //reshaper->Replace(tmpEdge,new2EdgeWire,Standard_False);
-      //Standard_Integer shapeStatus = reshaper->Status(tmpEdge,new2EdgeWire,Standard_False);
-      //TopoDS_Shape newShape;
-      //Standard_Integer shapeStatus = reshaper->Status(*(loftedSurfs[surfer]->geom_),newShape,Standard_False);
-      //reshaper->Replace(tmpEdge,edge0,Standard_False);
-      //Standard_Integer shapeStatus = reshaper->Status(tmpEdge,edge0,Standard_False);
-      //fprintf(stdout,"WHAT IS THE STATUS: %d\n", shapeStatus);
-
-      TopExp_Explorer faceExp0;
-      faceExp0.Init(*(loftedSurfs[surfer]->geom_), TopAbs_FACE);
-      TopoDS_Face face0 = TopoDS::Face(faceExp0.Current());
-
-      Handle(BRepTools_ReShape) reshaper =  new BRepTools_ReShape();
-      reshaper->Replace(tmpEdge,new2EdgeWire,Standard_True);
-      TopoDS_Shape newShape = reshaper->Apply(*(loftedSurfs[surfer]->geom_));
-      //*(loftedSurfs[surfer]->geom_) = newShape;
-
-      //// TRY TO MAKE OWN SHAPEEEEE=====================================
-      //Handle(BRepTools_ReShape) fullReshaper = new BRepTools_ReShape();
-      //fullReshaper->Replace(face0, newFace, Standard_True);
-      //TopoDS_Shape newShape = fullReshaper->Apply(*(loftedSurfs[surfer]->geom_));
-      //*(loftedSurfs[surfer]->geom_) = newShape;
-
-      //TopExp_Explorer faceExp1;
-      //faceExp1.Init(newShape, TopAbs_FACE);
-      //TopoDS_Face face1 = TopoDS::Face(faceExp1.Current());
-
-      BRepCheck_Analyzer postAnalyzer(*(loftedSurfs[surfer]->geom_), Standard_False);
-      fprintf(stdout,"POST ANALYZER RESULT: %d\n", postAnalyzer.IsValid());
-
-      BRep_Builder builder;
-      TopoDS_Shell shell;
-      builder.MakeShell(shell);
-
-      BRepBuilderAPI_NurbsConvert nurbs(face0);
-      Handle(Geom_Surface) geom_extrusion = BRepLib_FindSurface(nurbs).Surface();
-      Handle(Geom_BSplineSurface) bsplinesurf = Handle(Geom_BSplineSurface)::DownCast(geom_extrusion);
-
-      TopExp_Explorer NewWireExp;
-      NewWireExp.Init(freeWires,TopAbs_EDGE);
-      int numWires = 0;
-      std::vector<TopoDS_Wire> allWires;
-      for (int i=0;NewWireExp.More();NewWireExp.Next(),i++)
-      {
-        TopoDS_Edge toBeWireEdge = TopoDS::Edge(NewWireExp.Current());
-        BRepBuilderAPI_MakeWire fWireMaker(toBeWireEdge);
-        fWireMaker.Build();
-
-        allWires.push_back(fWireMaker.Wire());
-        numWires++;
-      }
-      fprintf(stdout,"NUM WIRES: %d\n", numWires);
-
-      TopExp_Explorer DumbExp;
-      std::vector<TopoDS_Edge> allEdges;
-      DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
-      for (int j=0;DumbExp.More();DumbExp.Next(),j++)
-      {
-        TopoDS_Edge singleEdge = TopoDS::Edge(DumbExp.Current());
-        allEdges.push_back(singleEdge);
-      }
-
-      if (surfer == -1)
-      {
-        //OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(bsplinesurf, *(loftedSurfs[surfer]->geom_), allEdges);
-        OCCTUtils_ShapeFromBSplineSurfaceWithEdges(bsplinesurf, *(loftedSurfs[surfer]->geom_), allEdges);
-      }
-
-
-      //// segmentation of TS
-      //Standard_Real Ui1,Ui2,V0,V1;
-      //Ui1 = 0;
-      //Ui2 = 1;
-      //Ui1 = OCCTUtils_PreciseUpar(Ui1, bsplinesurf);
-      //Ui2 = OCCTUtils_PreciseUpar(Ui2, bsplinesurf);
-      //V0  = bsplinesurf->VKnot(bsplinesurf->FirstVKnotIndex());
-      //V1  = bsplinesurf->VKnot(bsplinesurf->LastVKnotIndex());
-      //bsplinesurf->Segment(Ui1,Ui2,V0,V1);
-
-      //TopoDS_Face face;
-      //builder.MakeFace(face, bsplinesurf, Precision::Confusion());
-
-      //TopoDS_Wire NEWWIIRE;
-      //builder.MakeWire(NEWWIIRE);
-
-      //Standard_Real f1, f2, l1, l2;
-      //geom_extrusion->Bounds(f1,l1,f2,l2);
-      //fprintf(stdout,"WHAT ARE THEY HERE: %.6f %.6f %.6f %.6f\n", f1, l1, f2, l2);
-
-      //TopExp_Explorer DumbExp;
-      //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
-      //int numEdges = 0;
-      //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
-      //{
-      //  numEdges++;
-      //}
-
-      //std::vector<TopoDS_Edge> allEdges;
-      //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
-      //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
-      //{
-      //  TopLoc_Location newLoc;
-      //  Standard_Real newFirst, newLast;
-      //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
-      //  Handle(Geom_Curve) NEWCurve = BRep_Tool::Curve (theNEWEdge, newLoc, newFirst, newLast);
-
-      //  TopoDS_Vertex v0, v1;
-      //  TopExp::Vertices(theNEWEdge, v0, v1);
-
-      //  TopoDS_Edge createdEdge;
-      //  builder.MakeEdge(createdEdge, NEWCurve, Precision::Confusion());
-      //  v0.Orientation(TopAbs_FORWARD);
-      //  builder.Add(createdEdge, v0);
-      //  v1.Orientation(TopAbs_REVERSED);
-      //  builder.Add(createdEdge, v1);
-      //  builder.Range(createdEdge, 0, 1);
-      //  allEdges.push_back(createdEdge);
-      //}
-
-      //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
-      //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
-      //{
-      //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
-      //  builder.Add(NEWWIIRE, allEdges[j]);
-      //}
-
-      //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
-      //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
-      //{
-      //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
-      //  if (j == 2)
-      //  {
-      //    builder.UpdateEdge(allEdges[j], new Geom2d_Line(gp_Pnt2d(1,0), gp_Dir2d(0,1)),
-      //        face, Precision::Confusion());
-      //  }
-      //  else
-      //  {
-      //    builder.UpdateEdge(allEdges[j], new Geom2d_Line(gp_Pnt2d(0,1), gp_Dir2d(1,0)),
-      //        face, Precision::Confusion());
-      //  }
-      //  builder.Range(allEdges[j], face, 0, 1);
-
-      //}
-      //fprintf(stdout,"WAS NEW EDGE ADDED: %d\n", numEdges);
-
-      //builder.Add(face, NEWWIIRE);
-      //builder.Add(shell, face);
-
-      //*(loftedSurfs[surfer]->geom_) = OCCTUtils_MakeShell(shell);
-    }
-  }
-
-  // =====================================================================
-
-  //cvOCCTSolidModel* sewSolid=loftedSurfs[0];
-
-  //// CREATE USING SEWING
-  //fprintf(stdout,"SEWING\n");
-  //cvOCCTSolidModel *sewSolid = new cvOCCTSolidModel();
-  //double sewTol = 1.0;
-  //sewSolid->Sew(loftedSurfs, sewTol);
-  //fprintf(stdout,"SEWED\n");
-
-  // CREATE USING MAKE OF COMPOUND
-
-  cvOCCTSolidModel* sewSolid=loftedSurfs[0];
-  BRep_Builder compoundBuilder;
-  TopoDS_Compound Compound;
-  compoundBuilder.MakeCompound(Compound);
-  for (int surfer=0; surfer<loftedSurfs.size(); surfer++)
-  {
-    compoundBuilder.Add(Compound,*(loftedSurfs[surfer]->geom_));
-  }
-
-  *(sewSolid->geom_) = Compound;
-
-  //double sewTol = 1.0;
-  //cvOCCTSolidModel* previousSewSolid=NULL;
-  ////    SolidModel_SimplifyT smp = SM_Simplify_All;
-  //for(int i=1;i<loftedSurfs.size();i++)
-  //{
-  //  previousSewSolid=sewSolid;
-  //  sewSolid=new cvOCCTSolidModel();
-  //  if (sewSolid->Sew(loftedSurfs[i],previousSewSolid, sewTol) != SV_OK)
-  //  {
-  //    MITK_ERROR << "Failed sewing patches together" << endl;
+  //if(modelElement==NULL || modelElement->GetWholeVtkPolyData()==NULL)
   //    return NULL;
+
+  //cvPolyData *modelPolyData = new cvPolyData(modelElement->GetWholeVtkPolyData());
+  //cvPolyData *mergedPolyData = new cvPolyData(mergedCenterlines);
+  //cvPolyData *decomposedPolyData = NULL;
+  //std::vector<cvOCCTSolidModel*> loftedSurfs;
+
+  //if ( VTKSVUtils_DecomposePolyData(modelPolyData, mergedPolyData, &decomposedPolyData, loftedSurfs) != SV_OK )
+  //{
+  //  delete modelPolyData;
+  //  delete mergedPolyData;
+  //  if (decomposedPolyData != NULL)
+  //  {
+  //    delete decomposedPolyData;
+  //  }
+  //  return NULL;
+  //}
+
+  //delete modelPolyData;
+  //delete mergedPolyData;
+
+  //if(loftedSurfs.size()==0)
+  //{
+  //  fprintf(stderr,"No surfs from decomposition\n");
+  //  return NULL;
+  //}
+  //gp_Pnt pt0(1.2062324285507, -5.3187279701233, -76.282005310059);
+  //gp_Pnt pt1(1.1930881738663, 5.764274597168, -76.197998046875);
+  //TopoDS_Vertex vertex0 = BRepBuilderAPI_MakeVertex(pt0);
+  //TopoDS_Vertex vertex1 = BRepBuilderAPI_MakeVertex(pt1);
+
+  //// ============================ TEST SPLIT EDGE IN HAIFF ================
+  //for (int surfer=0; surfer<loftedSurfs.size(); surfer++)
+  //{
+  //  Standard_Real sewtoler =  1.e-6;
+  //  Standard_Real closetoler =  1.e-4;
+  //  ShapeFix_FreeBounds findFree(*(loftedSurfs[surfer]->geom_),sewtoler,closetoler,
+  //            Standard_False,Standard_False);
+  //  TopoDS_Compound freeWires = findFree.GetClosedWires();
+  //  TopExp_Explorer NewEdgeExp;
+  //  NewEdgeExp.Init(freeWires,TopAbs_EDGE);
+  //  for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
+  //  {
+  //    //if (surfer == 0)
+  //    //{
+  //      if (i != 0)
+  //      {
+  //        continue;
+  //      }
+  //    //}
+  //    //else
+  //    //{
+  //    //  if (i != 1)
+  //    //  {
+  //    //    continue;
+  //    //  }
+  //    //}
+
+
+  //    TopoDS_Edge tmpEdge = TopoDS::Edge(NewEdgeExp.Current());
+  //    GProp_GProps tmpEdgeProps;
+  //    BRepGProp::LinearProperties(tmpEdge,tmpEdgeProps);
+  //    fprintf(stdout,"FULL EDGE PROPS: %.6f\n", tmpEdgeProps.Mass());
+
+  //    TopLoc_Location tmpEdgeLoc;
+  //    Standard_Real tmpEdgeFirst, tmpEdgeLast;
+  //    Handle(Geom_Curve) tmpCurve = BRep_Tool::Curve (tmpEdge, tmpEdgeLoc, tmpEdgeFirst, tmpEdgeLast);
+
+
+  //    // Get closest point on curve
+  //    BRepExtrema_DistShapeShape closestPointFinder0(tmpEdge, vertex0);
+  //    closestPointFinder0.Perform();
+
+  //    fprintf(stdout,"ACTUAL CLOSE POINT 0: %.6f %.6f %.6f\n", closestPointFinder0.PointOnShape1(1).X(), closestPointFinder0.PointOnShape1(1).Y(), closestPointFinder0.PointOnShape1(1).Z());
+
+  //    Standard_Real newParam0;
+  //    closestPointFinder0.ParOnEdgeS1(1, newParam0);
+  //    fprintf(stdout,"ACTUAL CLOSE PARAMETER 0: %.6f\n", newParam0);
+
+  //    BRepExtrema_DistShapeShape closestPointFinder1(tmpEdge, vertex1);
+  //    closestPointFinder1.Perform();
+
+  //    fprintf(stdout,"ACTUAL CLOSE POINT 1: %.6f %.6f %.6f\n", closestPointFinder1.PointOnShape1(1).X(), closestPointFinder1.PointOnShape1(1).Y(), closestPointFinder1.PointOnShape1(1).Z());
+  //    Standard_Real newParam1;
+  //    closestPointFinder1.ParOnEdgeS1(1, newParam1);
+  //    fprintf(stdout,"ACTUAL CLOSE PARAMETER 1: %.6f\n", newParam1);
+
+  //    double midPt = (tmpEdgeLast-tmpEdgeFirst)*0.5;
+
+  //    if (newParam0 > newParam1)
+  //    {
+  //      Standard_Real tmp = newParam1;
+  //      newParam1 = newParam0;
+  //      newParam0 = tmp;
+  //    }
+
+  //    //TopoDS_Edge edge0 = BRepBuilderAPI_MakeEdge(tmpCurve, tmpEdgeFirst, midPt);
+  //    //TopoDS_Edge edge0 = BRepBuilderAPI_MakeEdge(tmpCurve, tmpEdgeFirst, newParam0);
+  //    TopoDS_Edge edge0 = BRepBuilderAPI_MakeEdge(tmpCurve, 0.0, 0.5);
+  //    GProp_GProps edge0Props;
+  //    BRepGProp::LinearProperties(edge0,edge0Props);
+  //    fprintf(stdout,"EDGE 0 PROPS: %.6f\n", edge0Props.Mass());
+
+  //    //TopoDS_Edge edge1 = BRepBuilderAPI_MakeEdge(tmpCurve, midPt, tmpEdgeLast);
+  //    //TopoDS_Edge edge1 = BRepBuilderAPI_MakeEdge(tmpCurve, newParam0, newParam1);
+  //    TopoDS_Edge edge1 = BRepBuilderAPI_MakeEdge(tmpCurve, 0.5, 1.0);
+  //    GProp_GProps edge1Props;
+  //    BRepGProp::LinearProperties(edge1,edge1Props);
+  //    fprintf(stdout,"EDGE 1 PROPS: %.6f\n", edge1Props.Mass());
+
+  //    //TopoDS_Edge edge2 = BRepBuilderAPI_MakeEdge(tmpCurve, newParam1, tmpEdgeLast);
+  //    TopoDS_Edge edge2 = BRepBuilderAPI_MakeEdge(tmpCurve, 0.25, 0.5);
+  //    GProp_GProps edge2Props;
+  //    BRepGProp::LinearProperties(edge2,edge2Props);
+  //    fprintf(stdout,"EDGE 2 PROPS: %.6f\n", edge2Props.Mass());
+
+  //    // Pull together edges 0 and 2
+  //    BRepBuilderAPI_MakeWire newWiremaker(edge0, edge2);
+  //    newWiremaker.Build();
+  //    TopoDS_Wire halfWire = newWiremaker.Wire();
+
+  //    //// Fuse together
+  //    //BRepLib_FuseEdges fuser(halfWire, Standard_False);
+  //    //fprintf(stdout,"NUM POINTS TO BE REMOVERRRED: %d\n", fuser.NbVertices());
+  //    //fuser.Perform();
+  //    //TopoDS_Shape fusedShape = fuser.Shape();
+
+  //    //TopExp_Explorer RealDumbExp;
+  //    //RealDumbExp.Init(fusedShape,TopAbs_EDGE);
+  //    //TopoDS_Edge newestEdge = TopoDS::Edge(RealDumbExp.Current());
+  //    //int numWireEdges = 0;
+  //    //for (int j=0;RealDumbExp.More();RealDumbExp.Next(),j++)
+  //    //{
+  //    //  numWireEdges++;
+  //    //}
+  //    //fprintf(stdout,"SHOUDL BE ONE FUSED EDGE: %d\n", numWireEdges);
+
+  //    //Handle(Geom_BSplineCurve) curv0BS = OCCTUtils_EdgeToBSpline(edge0);
+  //    //Handle(Geom_BSplineCurve) curv2BS = OCCTUtils_EdgeToBSpline(edge2);
+
+  //    //Standard_Real aTolV = Precision::Confusion();
+  //    //aTolV = 1.e-3;
+  //    //GeomConvert_CompCurveToBSplineCurve compBS(curv0BS);
+  //    ////Standard_Boolean didWork = compBS.Add(curv2BS, aTolV, Standard_True, Standard_False, 1);
+  //    //Standard_Boolean didWork = compBS.Add(curv2BS, aTolV);
+  //    //Handle(Geom_BSplineCurve) BS = compBS.BSplineCurve();
+  //    //fprintf(stdout,"DID WORK? %d\n", didWork);
+
+  //    //BRepBuilderAPI_MakeEdge edgeMaker(BS);
+  //    //edgeMaker.Build();
+  //    //TopoDS_Edge newestEdge = edgeMaker.Edge();
+
+  //    //TopExp_Explorer RealDumbExp;
+  //    //RealDumbExp.Init(newestEdge,TopAbs_EDGE);
+  //    //int numWireEdges = 0;
+  //    //for (int j=0;RealDumbExp.More();RealDumbExp.Next(),j++)
+  //    //{
+  //    //  numWireEdges++;
+  //    //}
+  //    //fprintf(stdout,"SHOUDL BE ONE FUSED EDGE: %d\n", numWireEdges);
+
+  //    //BRepBuilderAPI_MakeWire wiremaker(edge0, edge1);
+  //    //wiremaker.Build();
+  //    //TopoDS_Wire new2EdgeWire = wiremaker.Wire();
+  //    //BRepBuilderAPI_MakeWire newestWiremaker(edge1, newestEdge);
+  //    BRepBuilderAPI_MakeWire newestWiremaker(edge0, edge1);
+  //    newestWiremaker.Build();
+  //    TopoDS_Wire new2EdgeWire = newestWiremaker.Wire();
+
+  //    //// ===================== WRITE OUT THE THREE EDGES ===================
+  //    //TopLoc_Location edge0Loc, edge1Loc, edge2Loc;
+  //    //Standard_Real edge0First, edge0Last, edge1First, edge1Last, edge2First, edge2Last;
+  //    //Handle(Geom_Curve) okayCurve0 = BRep_Tool::Curve (newestEdge, edge0Loc, edge0First, edge0Last);
+  //    //Handle(Geom_Curve) okayCurve1 = BRep_Tool::Curve (edge1, edge1Loc, edge1First, edge1Last);
+  //    //fprintf(stdout,"FIRST AND LAST 0: %.6f %.6f\n", edge0First, edge0Last);
+  //    //fprintf(stdout,"FIRST AND LAST 1: %.6f %.6f\n", edge1First, edge1Last);
+
+  //    //vtkNew(vtkPoints, okayPoints0);
+  //    //vtkNew(vtkPoints, okayPoints1);
+  //    //for (int j=0; j<20; j++)
+  //    //{
+  //    //  double val0 = (edge0Last - edge0First)*(j/20.) + edge0First;
+  //    //  double val1 = (edge1Last - edge1First)*(j/20.) + edge1First;
+  //    //  gp_Pnt okayPt0 = okayCurve0->Value(val0);
+  //    //  gp_Pnt okayPt1 = okayCurve1->Value(val1);
+
+  //    //  okayPoints0->InsertNextPoint(okayPt0.X(), okayPt0.Y(), okayPt0.Z());
+  //    //  okayPoints1->InsertNextPoint(okayPt1.X(), okayPt1.Y(), okayPt1.Z());
+  //    //}
+  //    //vtkNew(vtkPolyData, okayPointsPd0);
+  //    //okayPointsPd0->SetPoints(okayPoints0);
+  //    //vtkNew(vtkPolyData, okayPointsPd1);
+  //    //okayPointsPd1->SetPoints(okayPoints1);
+
+  //    //std::string fn0 = "/Users/adamupdegrove/Desktop/tmp/USERCURVE"+std::to_string(surfer)+"_0.vtp";
+  //    //std::string fn1 = "/Users/adamupdegrove/Desktop/tmp/USERCURVE"+std::to_string(surfer)+"_1.vtp";
+  //    //vtkSVIOUtils::WriteVTPFile(fn0, okayPointsPd0);
+  //    //vtkSVIOUtils::WriteVTPFile(fn1, okayPointsPd1);
+  //    //// ===================== WRITE OUT THE THREE EDGES ===================
+
+  //    // ==============================ANALYZER ================================
+  //    BRepCheck_Analyzer preAnalyzer(*(loftedSurfs[surfer]->geom_), Standard_False);
+  //    fprintf(stdout,"PRE ANALYZER RESULT: %d\n", preAnalyzer.IsValid());
+
+  //    // =======================================================================
+
+  //    //reshaper->Replace(tmpEdge,new2EdgeWire,Standard_False);
+  //    //Standard_Integer shapeStatus = reshaper->Status(tmpEdge,new2EdgeWire,Standard_False);
+  //    //TopoDS_Shape newShape;
+  //    //Standard_Integer shapeStatus = reshaper->Status(*(loftedSurfs[surfer]->geom_),newShape,Standard_False);
+  //    //reshaper->Replace(tmpEdge,edge0,Standard_False);
+  //    //Standard_Integer shapeStatus = reshaper->Status(tmpEdge,edge0,Standard_False);
+  //    //fprintf(stdout,"WHAT IS THE STATUS: %d\n", shapeStatus);
+
+  //    TopExp_Explorer faceExp0;
+  //    faceExp0.Init(*(loftedSurfs[surfer]->geom_), TopAbs_FACE);
+  //    TopoDS_Face face0 = TopoDS::Face(faceExp0.Current());
+
+  //    Handle(BRepTools_ReShape) reshaper =  new BRepTools_ReShape();
+  //    reshaper->Replace(tmpEdge,new2EdgeWire,Standard_True);
+  //    TopoDS_Shape newShape = reshaper->Apply(*(loftedSurfs[surfer]->geom_));
+  //    //*(loftedSurfs[surfer]->geom_) = newShape;
+
+  //    //// TRY TO MAKE OWN SHAPEEEEE=====================================
+  //    //Handle(BRepTools_ReShape) fullReshaper = new BRepTools_ReShape();
+  //    //fullReshaper->Replace(face0, newFace, Standard_True);
+  //    //TopoDS_Shape newShape = fullReshaper->Apply(*(loftedSurfs[surfer]->geom_));
+  //    //*(loftedSurfs[surfer]->geom_) = newShape;
+
+  //    //TopExp_Explorer faceExp1;
+  //    //faceExp1.Init(newShape, TopAbs_FACE);
+  //    //TopoDS_Face face1 = TopoDS::Face(faceExp1.Current());
+
+  //    BRepCheck_Analyzer postAnalyzer(*(loftedSurfs[surfer]->geom_), Standard_False);
+  //    fprintf(stdout,"POST ANALYZER RESULT: %d\n", postAnalyzer.IsValid());
+
+  //    BRep_Builder builder;
+  //    TopoDS_Shell shell;
+  //    builder.MakeShell(shell);
+
+  //    BRepBuilderAPI_NurbsConvert nurbs(face0);
+  //    Handle(Geom_Surface) geom_extrusion = BRepLib_FindSurface(nurbs).Surface();
+  //    Handle(Geom_BSplineSurface) bsplinesurf = Handle(Geom_BSplineSurface)::DownCast(geom_extrusion);
+
+  //    TopExp_Explorer NewWireExp;
+  //    NewWireExp.Init(freeWires,TopAbs_EDGE);
+  //    int numWires = 0;
+  //    std::vector<TopoDS_Wire> allWires;
+  //    for (int i=0;NewWireExp.More();NewWireExp.Next(),i++)
+  //    {
+  //      TopoDS_Edge toBeWireEdge = TopoDS::Edge(NewWireExp.Current());
+  //      BRepBuilderAPI_MakeWire fWireMaker(toBeWireEdge);
+  //      fWireMaker.Build();
+
+  //      allWires.push_back(fWireMaker.Wire());
+  //      numWires++;
+  //    }
+  //    fprintf(stdout,"NUM WIRES: %d\n", numWires);
+
+  //    TopExp_Explorer DumbExp;
+  //    std::vector<TopoDS_Edge> allEdges;
+  //    DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+  //    for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+  //    {
+  //      TopoDS_Edge singleEdge = TopoDS::Edge(DumbExp.Current());
+  //      allEdges.push_back(singleEdge);
+  //    }
+
+  //    if (surfer == -1)
+  //    {
+  //      //OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(bsplinesurf, *(loftedSurfs[surfer]->geom_), allEdges);
+  //      OCCTUtils_ShapeFromBSplineSurfaceWithEdges(bsplinesurf, *(loftedSurfs[surfer]->geom_), allEdges);
+  //    }
+
+
+  //    //// segmentation of TS
+  //    //Standard_Real Ui1,Ui2,V0,V1;
+  //    //Ui1 = 0;
+  //    //Ui2 = 1;
+  //    //Ui1 = OCCTUtils_PreciseUpar(Ui1, bsplinesurf);
+  //    //Ui2 = OCCTUtils_PreciseUpar(Ui2, bsplinesurf);
+  //    //V0  = bsplinesurf->VKnot(bsplinesurf->FirstVKnotIndex());
+  //    //V1  = bsplinesurf->VKnot(bsplinesurf->LastVKnotIndex());
+  //    //bsplinesurf->Segment(Ui1,Ui2,V0,V1);
+
+  //    //TopoDS_Face face;
+  //    //builder.MakeFace(face, bsplinesurf, Precision::Confusion());
+
+  //    //TopoDS_Wire NEWWIIRE;
+  //    //builder.MakeWire(NEWWIIRE);
+
+  //    //Standard_Real f1, f2, l1, l2;
+  //    //geom_extrusion->Bounds(f1,l1,f2,l2);
+  //    //fprintf(stdout,"WHAT ARE THEY HERE: %.6f %.6f %.6f %.6f\n", f1, l1, f2, l2);
+
+  //    //TopExp_Explorer DumbExp;
+  //    //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+  //    //int numEdges = 0;
+  //    //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+  //    //{
+  //    //  numEdges++;
+  //    //}
+
+  //    //std::vector<TopoDS_Edge> allEdges;
+  //    //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+  //    //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+  //    //{
+  //    //  TopLoc_Location newLoc;
+  //    //  Standard_Real newFirst, newLast;
+  //    //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
+  //    //  Handle(Geom_Curve) NEWCurve = BRep_Tool::Curve (theNEWEdge, newLoc, newFirst, newLast);
+
+  //    //  TopoDS_Vertex v0, v1;
+  //    //  TopExp::Vertices(theNEWEdge, v0, v1);
+
+  //    //  TopoDS_Edge createdEdge;
+  //    //  builder.MakeEdge(createdEdge, NEWCurve, Precision::Confusion());
+  //    //  v0.Orientation(TopAbs_FORWARD);
+  //    //  builder.Add(createdEdge, v0);
+  //    //  v1.Orientation(TopAbs_REVERSED);
+  //    //  builder.Add(createdEdge, v1);
+  //    //  builder.Range(createdEdge, 0, 1);
+  //    //  allEdges.push_back(createdEdge);
+  //    //}
+
+  //    //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+  //    //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+  //    //{
+  //    //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
+  //    //  builder.Add(NEWWIIRE, allEdges[j]);
+  //    //}
+
+  //    //DumbExp.Init(*(loftedSurfs[surfer]->geom_),TopAbs_EDGE);
+  //    //for (int j=0;DumbExp.More();DumbExp.Next(),j++)
+  //    //{
+  //    //  TopoDS_Edge theNEWEdge = TopoDS::Edge(DumbExp.Current());
+  //    //  if (j == 2)
+  //    //  {
+  //    //    builder.UpdateEdge(allEdges[j], new Geom2d_Line(gp_Pnt2d(1,0), gp_Dir2d(0,1)),
+  //    //        face, Precision::Confusion());
+  //    //  }
+  //    //  else
+  //    //  {
+  //    //    builder.UpdateEdge(allEdges[j], new Geom2d_Line(gp_Pnt2d(0,1), gp_Dir2d(1,0)),
+  //    //        face, Precision::Confusion());
+  //    //  }
+  //    //  builder.Range(allEdges[j], face, 0, 1);
+
+  //    //}
+  //    //fprintf(stdout,"WAS NEW EDGE ADDED: %d\n", numEdges);
+
+  //    //builder.Add(face, NEWWIIRE);
+  //    //builder.Add(shell, face);
+
+  //    //*(loftedSurfs[surfer]->geom_) = OCCTUtils_MakeShell(shell);
   //  }
   //}
 
-  // Check of shell DOESNT WORK
-  //BRepCheck_Shell shellChecker(TopoDS::Shell(*(sewSolid->geom_)));
-  //BRepCheck_ListOfStatus status = shellChecker.Status();
-  //BRepCheck_ListIteratorOfListOfStatus statit;
-  //statit.Initialize(status);
-  //for (int j=0; statit.More(); statit.Next(), j++)
+  //// =====================================================================
+
+  ////cvOCCTSolidModel* sewSolid=loftedSurfs[0];
+
+  ////// CREATE USING SEWING
+  ////fprintf(stdout,"SEWING\n");
+  ////cvOCCTSolidModel *sewSolid = new cvOCCTSolidModel();
+  ////double sewTol = 1.0;
+  ////sewSolid->Sew(loftedSurfs, sewTol);
+  ////fprintf(stdout,"SEWED\n");
+
+  //// CREATE USING MAKE OF COMPOUND
+
+  //cvOCCTSolidModel* sewSolid=loftedSurfs[0];
+  //BRep_Builder compoundBuilder;
+  //TopoDS_Compound Compound;
+  //compoundBuilder.MakeCompound(Compound);
+  //for (int surfer=0; surfer<loftedSurfs.size(); surfer++)
   //{
-  //  BRepCheck_Status checker = statit.Value();
-  //  fprintf(stdout,"WHAT IS SHELL STATUS: %d\n", checker);
+  //  compoundBuilder.Add(Compound,*(loftedSurfs[surfer]->geom_));
   //}
-  //
-  // LETS TRY TO CREATE SOMETHING OF THIS
 
-  //TopoDS_Shell shell;
+  //*(sewSolid->geom_) = Compound;
 
-  //BRep_Builder B;
-  //fprintf(stdout,"MAKE SHELL\n");
-  //B.MakeShell(shell);
+  ////double sewTol = 1.0;
+  ////cvOCCTSolidModel* previousSewSolid=NULL;
+  //////    SolidModel_SimplifyT smp = SM_Simplify_All;
+  ////for(int i=1;i<loftedSurfs.size();i++)
+  ////{
+  ////  previousSewSolid=sewSolid;
+  ////  sewSolid=new cvOCCTSolidModel();
+  ////  if (sewSolid->Sew(loftedSurfs[i],previousSewSolid, sewTol) != SV_OK)
+  ////  {
+  ////    MITK_ERROR << "Failed sewing patches together" << endl;
+  ////    return NULL;
+  ////  }
+  ////}
 
-  TopExp_Explorer thisFaceExp;
-  thisFaceExp.Init(*(sewSolid->geom_),TopAbs_FACE);
-  TopoDS_Face thisFace = TopoDS::Face(thisFaceExp.Current());
-  int faceCount = 0;
-  for (int j=0; thisFaceExp.More(); thisFaceExp.Next(), j++)
-  {
-    faceCount++;
-  }
-  fprintf(stdout,"NUM FACES: %d\n", faceCount);
+  //// Check of shell DOESNT WORK
+  ////BRepCheck_Shell shellChecker(TopoDS::Shell(*(sewSolid->geom_)));
+  ////BRepCheck_ListOfStatus status = shellChecker.Status();
+  ////BRepCheck_ListIteratorOfListOfStatus statit;
+  ////statit.Initialize(status);
+  ////for (int j=0; statit.More(); statit.Next(), j++)
+  ////{
+  ////  BRepCheck_Status checker = statit.Value();
+  ////  fprintf(stdout,"WHAT IS SHELL STATUS: %d\n", checker);
+  ////}
+  ////
+  //// LETS TRY TO CREATE SOMETHING OF THIS
 
-  //BRepCheck_ListOfStatus thelist;
-  //BRepCheck_DataMapOfShapeListOfStatus myMap;
-  //fprintf(stdout,"BIND\n");
-  //myMap.Bind(thisFace, thelist);
-  //fprintf(stdout,"MAP LIST\n");
-  //BRepCheck_ListOfStatus& lst = myMap(thisFace);
+  ////TopoDS_Shell shell;
 
-  //fprintf(stdout,"T FACE\n");
-  //Handle(BRep_TFace)& TF = *((Handle(BRep_TFace)*) &thisFace.TShape());
-  //fprintf(stdout,"CHECK NULL\n");
-  //if (TF->Surface().IsNull()) {
-  //fprintf(stdout,"IS NULL\n");
-  //  BRepCheck::Add(lst,BRepCheck_NoSurface);
-  //fprintf(stdout,"ADD NADA\n");
-  //}
-  //else {
-  //  // Flag natural restriction???
-  //}
-  //if (lst.IsEmpty()) {
-  //fprintf(stdout,"LIST EMPTY\n");
-  //  lst.Append(BRepCheck_NoError);
-  //fprintf(stdout,"APPEND NO ERROR\n");
-  //}
-  //fprintf(stdout,"AQUIIII\n");
+  ////BRep_Builder B;
+  ////fprintf(stdout,"MAKE SHELL\n");
+  ////B.MakeShell(shell);
 
-  //BRepCheck_Face faceChecker(thisFace);
-  //fprintf(stdout,"INTERSECT WIRES: %d\n", faceChecker.IntersectWires());
-  //fprintf(stdout,"CLASSIFY WIRES:  %d\n", faceChecker.ClassifyWires());
-  //fprintf(stdout,"ORIENTATION OF WIRES: %d\n", faceChecker.OrientationOfWires());
-  //fprintf(stdout,"IS UNORIENTABLE: %d\n", faceChecker.IsUnorientable());
-  //fprintf(stdout,"GEOMETRIC CONTROLS: %d\n", faceChecker.GeometricControls());
-
-  //fprintf(stdout,"ADD FACE\n");
-  //B.Add(shell, thisFace);
-
-  //Standard_Real thissewtoler =  1.e-6;
-  //Standard_Real thisclosetoler =  1.e-4;
-  //ShapeFix_FreeBounds thisfindFree(*(sewSolid->geom_),thissewtoler,thisclosetoler,
-  //          Standard_False,Standard_False);
-  //TopoDS_Compound thisfreeWires = thisfindFree.GetClosedWires();
-  //TopExp_Explorer thisEdgeExp;
-  ////thisEdgeExp.Init(thisfreeWires,TopAbs_WIRE);
-  //thisEdgeExp.Init(*(sewSolid->geom_),TopAbs_EDGE);
-
-  //fprintf(stdout,"MAKE WIRE\n");
-  //TopoDS_Wire wire;
-  //B.MakeWire(wire);
-
-  //for (int j=0; thisEdgeExp.More(); thisEdgeExp.Next(), j++)
+  //TopExp_Explorer thisFaceExp;
+  //thisFaceExp.Init(*(sewSolid->geom_),TopAbs_FACE);
+  //TopoDS_Face thisFace = TopoDS::Face(thisFaceExp.Current());
+  //int faceCount = 0;
+  //for (int j=0; thisFaceExp.More(); thisFaceExp.Next(), j++)
   //{
-  //  TopoDS_Edge thisEdge = TopoDS::Edge(thisEdgeExp.Current());
-
-  //  //fprintf(stdout,"MAKE WIRE\n");
-  //  //B.MakeWire(thisWire);
-  //  fprintf(stdout,"ADD EDGE\n");
-  //  B.Add(wire, thisEdge);
+  //  faceCount++;
   //}
+  //fprintf(stdout,"NUM FACES: %d\n", faceCount);
 
-  //fprintf(stdout,"ADD WIRE\n");
-  //B.Add(thisFace, wire);
+  ////BRepCheck_ListOfStatus thelist;
+  ////BRepCheck_DataMapOfShapeListOfStatus myMap;
+  ////fprintf(stdout,"BIND\n");
+  ////myMap.Bind(thisFace, thelist);
+  ////fprintf(stdout,"MAP LIST\n");
+  ////BRepCheck_ListOfStatus& lst = myMap(thisFace);
 
-  //fprintf(stdout,"CREATE SHELL\n");
-  //TopoDS_Shape finalShape = OCCTUtils_MakeShell(shell);
-  //*(sewSolid->geom_) = finalShape;
+  ////fprintf(stdout,"T FACE\n");
+  ////Handle(BRep_TFace)& TF = *((Handle(BRep_TFace)*) &thisFace.TShape());
+  ////fprintf(stdout,"CHECK NULL\n");
+  ////if (TF->Surface().IsNull()) {
+  ////fprintf(stdout,"IS NULL\n");
+  ////  BRepCheck::Add(lst,BRepCheck_NoSurface);
+  ////fprintf(stdout,"ADD NADA\n");
+  ////}
+  ////else {
+  ////  // Flag natural restriction???
+  ////}
+  ////if (lst.IsEmpty()) {
+  ////fprintf(stdout,"LIST EMPTY\n");
+  ////  lst.Append(BRepCheck_NoError);
+  ////fprintf(stdout,"APPEND NO ERROR\n");
+  ////}
+  ////fprintf(stdout,"AQUIIII\n");
 
-  // NOW CALCULATE HAUSDORFF
-  fprintf(stdout,"CALCULATE DISTANCES\n");
-  BRepExtrema_DistShapeShape distanceFinder;
-  distanceFinder.LoadS1(*(sewSolid->geom_));
+  ////BRepCheck_Face faceChecker(thisFace);
+  ////fprintf(stdout,"INTERSECT WIRES: %d\n", faceChecker.IntersectWires());
+  ////fprintf(stdout,"CLASSIFY WIRES:  %d\n", faceChecker.ClassifyWires());
+  ////fprintf(stdout,"ORIENTATION OF WIRES: %d\n", faceChecker.OrientationOfWires());
+  ////fprintf(stdout,"IS UNORIENTABLE: %d\n", faceChecker.IsUnorientable());
+  ////fprintf(stdout,"GEOMETRIC CONTROLS: %d\n", faceChecker.GeometricControls());
 
-  // Average
-  vtkNew(vtkDoubleArray, distanceArray);
-  distanceArray->SetNumberOfTuples(wallPd->GetNumberOfPoints());
-  distanceArray->SetName("Distance");
-  double avgDist = 0.0;
-  double maxDist = -1.0;
-  double minDist = VTK_SV_LARGE_DOUBLE;
+  ////fprintf(stdout,"ADD FACE\n");
+  ////B.Add(shell, thisFace);
 
-  double dist;
-  double pt[3];
-  TopoDS_Vertex vert;
-  gp_Pnt pnt;
-  for (int i=0; i<wallPd->GetNumberOfPoints(); i++)
-  {
-    wallPd->GetPoint(i, pt);
-    pnt.SetCoord(pt[0], pt[1], pt[2]);
-    vert = BRepBuilderAPI_MakeVertex(pnt);
+  ////Standard_Real thissewtoler =  1.e-6;
+  ////Standard_Real thisclosetoler =  1.e-4;
+  ////ShapeFix_FreeBounds thisfindFree(*(sewSolid->geom_),thissewtoler,thisclosetoler,
+  ////          Standard_False,Standard_False);
+  ////TopoDS_Compound thisfreeWires = thisfindFree.GetClosedWires();
+  ////TopExp_Explorer thisEdgeExp;
+  //////thisEdgeExp.Init(thisfreeWires,TopAbs_WIRE);
+  ////thisEdgeExp.Init(*(sewSolid->geom_),TopAbs_EDGE);
 
-    distanceFinder.LoadS2(vert);
-    if (distanceFinder.Perform() != 1)
-    {
-      std::cerr << "Finding distance didnt complete." << endl;
-      return wallPd;
-    }
+  ////fprintf(stdout,"MAKE WIRE\n");
+  ////TopoDS_Wire wire;
+  ////B.MakeWire(wire);
 
-    dist = distanceFinder.Value();
-    distanceArray->SetTuple1(i, dist);
+  ////for (int j=0; thisEdgeExp.More(); thisEdgeExp.Next(), j++)
+  ////{
+  ////  TopoDS_Edge thisEdge = TopoDS::Edge(thisEdgeExp.Current());
 
-    avgDist += dist;
-    if (dist > maxDist)
-    {
-      maxDist = dist;
-    }
-    if (dist < minDist)
-    {
-      minDist = dist;
-    }
-  }
-  avgDist /= wallPd->GetNumberOfPoints();
+  ////  //fprintf(stdout,"MAKE WIRE\n");
+  ////  //B.MakeWire(thisWire);
+  ////  fprintf(stdout,"ADD EDGE\n");
+  ////  B.Add(wire, thisEdge);
+  ////}
 
-  wallPd->GetPointData()->AddArray(distanceArray);
-  std::string fn = "/Users/adamupdegrove/Desktop/tmp/DISTANCEFILE.vtp";
-  vtkSVIOUtils::WriteVTPFile(fn, wallPd);
+  ////fprintf(stdout,"ADD WIRE\n");
+  ////B.Add(thisFace, wire);
 
-  fprintf(stdout,"MAX DISTANCE: %.6f\n", maxDist);
-  fprintf(stdout,"MIN DISTANCE: %.6f\n", minDist);
-  fprintf(stdout,"AVG DISTANCE: %.6f\n", avgDist);
+  ////fprintf(stdout,"CREATE SHELL\n");
+  ////TopoDS_Shape finalShape = OCCTUtils_MakeShell(shell);
+  ////*(sewSolid->geom_) = finalShape;
+
+  ////// NOW CALCULATE HAUSDORFF
+  ////fprintf(stdout,"CALCULATE DISTANCES\n");
+  ////BRepExtrema_DistShapeShape distanceFinder;
+  ////distanceFinder.LoadS1(*(sewSolid->geom_));
+
+  ////// Average
+  ////vtkNew(vtkDoubleArray, distanceArray);
+  ////distanceArray->SetNumberOfTuples(wallPd->GetNumberOfPoints());
+  ////distanceArray->SetName("Distance");
+  ////double avgDist = 0.0;
+  ////double maxDist = -1.0;
+  ////double minDist = VTK_SV_LARGE_DOUBLE;
+
+  ////double dist;
+  ////double pt[3];
+  ////TopoDS_Vertex vert;
+  ////gp_Pnt pnt;
+  ////for (int i=0; i<wallPd->GetNumberOfPoints(); i++)
+  ////{
+  ////  wallPd->GetPoint(i, pt);
+  ////  pnt.SetCoord(pt[0], pt[1], pt[2]);
+  ////  vert = BRepBuilderAPI_MakeVertex(pnt);
+
+  ////  distanceFinder.LoadS2(vert);
+  ////  if (distanceFinder.Perform() != 1)
+  ////  {
+  ////    std::cerr << "Finding distance didnt complete." << endl;
+  ////    return wallPd;
+  ////  }
+
+  ////  dist = distanceFinder.Value();
+  ////  distanceArray->SetTuple1(i, dist);
+
+  ////  avgDist += dist;
+  ////  if (dist > maxDist)
+  ////  {
+  ////    maxDist = dist;
+  ////  }
+  ////  if (dist < minDist)
+  ////  {
+  ////    minDist = dist;
+  ////  }
+  ////}
+  ////avgDist /= wallPd->GetNumberOfPoints();
+
+  ////wallPd->GetPointData()->AddArray(distanceArray);
+  ////std::string fn = "/Users/adamupdegrove/Desktop/tmp/DISTANCEFILE.vtp";
+  ////vtkSVIOUtils::WriteVTPFile(fn, wallPd);
+
+  ////fprintf(stdout,"MAX DISTANCE: %.6f\n", maxDist);
+  ////fprintf(stdout,"MIN DISTANCE: %.6f\n", minDist);
+  ////fprintf(stdout,"AVG DISTANCE: %.6f\n", avgDist);
 
 
-  fprintf(stdout,"GET VTK REP\n");
-  //cvPolyData *wholePd = sewSolid->GetPolyData(0, 20.0);
-  cvPolyData *wholePd = sewSolid->GetPolyData(1, 5.0);
+  //fprintf(stdout,"GET VTK REP\n");
+  ////cvPolyData *wholePd = sewSolid->GetPolyData(0, 20.0);
+  //cvPolyData *wholePd = sewSolid->GetPolyData(1, 5.0);
 
-  return wholePd->GetVtkPolyData();
+  //return wholePd->GetVtkPolyData();
   //return decomposedPolyData->GetVtkPolyData();
 
   ////setup face names

@@ -811,6 +811,7 @@ int OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(const Handle(Geom_BSplineSur
 
 void OCCTUtils_AnalyzeShape(TopoDS_Shape shape)
 {
+  std::cout<<"Analyzing Shape"<<endl;
   Handle(TopTools_HSequenceOfShape) sl,slv,sle,slw,slf,sls,slo;
   sl = new TopTools_HSequenceOfShape();
   Handle(TColStd_HArray1OfInteger) NbProblems = new
