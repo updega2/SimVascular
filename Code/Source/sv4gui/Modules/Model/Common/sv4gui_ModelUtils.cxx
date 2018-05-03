@@ -1022,13 +1022,23 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElemen
     }
 
     cvPolyData *src=new cvPolyData(inpd);
+    cvPolyData *tmpCleaned = NULL;
     cvPolyData *cleaned = NULL;
     cvPolyData *capped  = NULL;
     int numCapCenterIds;
     int *capCenterIds=NULL;
 
-    cleaned = sys_geom_Clean(src);
+    tmpCleaned = sys_geom_Clean(src);
     delete src;
+
+    // Need to triangulate in between to make sure valid input to capper
+    vtkNew(vtkTriangleFilter, triangulator);
+    triangulator->SetInputData(tmpCleaned->GetVtkPolyData());
+    triangulator->PassLinesOff();
+    triangulator->PassVertsOff();
+    triangulator->Update();
+
+    cleaned = new cvPolyData(triangulator->GetOutput());
 
     if ( VMTKUtils_Cap(cleaned, &capped, &numCapCenterIds, &capCenterIds, 1 ) != SV_OK)
     {
@@ -1045,6 +1055,45 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElemen
       return NULL;
     }
     delete cleaned;
+
+    vtkNew(vtkCleanPolyData, cleaner);
+    cleaner->SetInputData(capped->GetVtkPolyData());
+    cleaner->Update();
+
+    vtkNew(vtkPolyData, tmpPd);
+    tmpPd->DeepCopy(cleaner->GetOutput());
+
+    for (int i=0; i<tmpPd->GetNumberOfCells(); i++)
+    {
+      if (tmpPd->GetCellType(i) != VTK_TRIANGLE)
+      {
+        tmpPd->DeleteCell(i);
+      }
+    }
+
+    // Just in case things are removed by cleaner or deleted cells, reset
+    // cap center ids
+    tmpPd->RemoveDeletedCells();
+    tmpPd->BuildLinks();
+
+    vtkNew(vtkPointLocator, pointLocator);
+    pointLocator->SetDataSet(tmpPd);
+    pointLocator->BuildLocator();
+
+    int currCapCenterId, newCapCenterId;
+    double pt[3];
+    for (int i=0; i<numCapCenterIds; i++)
+    {
+      currCapCenterId = capCenterIds[i];
+      capped->GetVtkPolyData()->GetPoint(currCapCenterId, pt);
+
+      newCapCenterId = pointLocator->FindClosestPoint(pt);
+      capCenterIds[i] = newCapCenterId;
+    }
+
+    // Reset capped now
+    delete capped;
+    capped = new cvPolyData(tmpPd);
 
     vtkSmartPointer<vtkIdList> sourcePtIds = vtkSmartPointer<vtkIdList>::New();
     vtkSmartPointer<vtkIdList> targetPtIds = vtkSmartPointer<vtkIdList>::New();
@@ -1108,6 +1157,16 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlines(sv4guiModelElement* modelElemen
     for (int i=0; i<numCapCenterIds; i++)
       capCenterPtIds->InsertNextId(capCenterIds[i]);
     delete [] capCenterIds;
+
+    vtkNew(vtkCleanPolyData, testCleaner);
+    testCleaner->SetInputData(capped->GetVtkPolyData());
+    testCleaner->Update();
+
+    if (testCleaner->GetOutput()->GetNumberOfPoints() != capped->GetVtkPolyData()->GetNumberOfPoints() || testCleaner->GetOutput()->GetNumberOfCells() != capped->GetVtkPolyData()->GetNumberOfCells())
+    {
+      MITK_ERROR << "Error after cap" << endl;
+      return NULL;
+    }
 
     vtkPolyData* centerlines=CreateCenterlines(capped->GetVtkPolyData(),
                                                sourcePtIds, targetPtIds,
@@ -1423,6 +1482,19 @@ bool sv4guiModelUtils::TriangulateSurface(vtkPolyData* pd)
 vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement,
                                                     vtkPolyData *mergedCenterlines)
 {
+  vtkSmartPointer<vtkPolyData> wallPd=vtkSmartPointer<vtkPolyData>::New();
+  wallPd->DeepCopy(modelElement->GetWholeVtkPolyData());
+
+  if(!DeleteRegions(wallPd,modelElement->GetCapFaceIDs()))
+  {
+    return NULL;
+  }
+
+  vtkNew(vtkCleanPolyData, cleaner);
+  cleaner->SetInputData(wallPd);
+  cleaner->Update();
+  wallPd->DeepCopy(cleaner->GetOutput());
+
   cvOCCTSolidModel *cylinderSolid = new cvOCCTSolidModel();
   double radius = 2.0;
   double length = 2.0;
@@ -1728,7 +1800,7 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
         allEdges.push_back(singleEdge);
       }
 
-      if (surfer == 0)
+      if (surfer == -1)
       {
         //OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(bsplinesurf, *(loftedSurfs[surfer]->geom_), allEdges);
         OCCTUtils_ShapeFromBSplineSurfaceWithEdges(bsplinesurf, *(loftedSurfs[surfer]->geom_), allEdges);
@@ -1949,6 +2021,60 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
   //fprintf(stdout,"CREATE SHELL\n");
   //TopoDS_Shape finalShape = OCCTUtils_MakeShell(shell);
   //*(sewSolid->geom_) = finalShape;
+
+  // NOW CALCULATE HAUSDORFF
+  fprintf(stdout,"CALCULATE DISTANCES\n");
+  BRepExtrema_DistShapeShape distanceFinder;
+  distanceFinder.LoadS1(*(sewSolid->geom_));
+
+  // Average
+  vtkNew(vtkDoubleArray, distanceArray);
+  distanceArray->SetNumberOfTuples(wallPd->GetNumberOfPoints());
+  distanceArray->SetName("Distance");
+  double avgDist = 0.0;
+  double maxDist = -1.0;
+  double minDist = VTK_SV_LARGE_DOUBLE;
+
+  double dist;
+  double pt[3];
+  TopoDS_Vertex vert;
+  gp_Pnt pnt;
+  for (int i=0; i<wallPd->GetNumberOfPoints(); i++)
+  {
+    wallPd->GetPoint(i, pt);
+    pnt.SetCoord(pt[0], pt[1], pt[2]);
+    vert = BRepBuilderAPI_MakeVertex(pnt);
+
+    distanceFinder.LoadS2(vert);
+    if (distanceFinder.Perform() != 1)
+    {
+      std::cerr << "Finding distance didnt complete." << endl;
+      return wallPd;
+    }
+
+    dist = distanceFinder.Value();
+    distanceArray->SetTuple1(i, dist);
+
+    avgDist += dist;
+    if (dist > maxDist)
+    {
+      maxDist = dist;
+    }
+    if (dist < minDist)
+    {
+      minDist = dist;
+    }
+  }
+  avgDist /= wallPd->GetNumberOfPoints();
+
+  wallPd->GetPointData()->AddArray(distanceArray);
+  std::string fn = "/Users/adamupdegrove/Desktop/tmp/DISTANCEFILE.vtp";
+  vtkSVIOUtils::WriteVTPFile(fn, wallPd);
+
+  fprintf(stdout,"MAX DISTANCE: %.6f\n", maxDist);
+  fprintf(stdout,"MIN DISTANCE: %.6f\n", minDist);
+  fprintf(stdout,"AVG DISTANCE: %.6f\n", avgDist);
+
 
   fprintf(stdout,"GET VTK REP\n");
   //cvPolyData *wholePd = sewSolid->GetPolyData(0, 20.0);
