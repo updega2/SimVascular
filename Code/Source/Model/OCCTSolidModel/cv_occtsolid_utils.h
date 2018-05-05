@@ -142,6 +142,8 @@ SV_EXPORT_OPENCASCADE void OCCTUtils_GetProblemSub(const BRepCheck_Analyzer& Ana
 SV_EXPORT_OPENCASCADE void OCCTUtils_FillProblems(const BRepCheck_Status stat,
                            Handle(TColStd_HArray1OfInteger)& NbProblems);
 
+SV_EXPORT_OPENCASCADE TopoDS_Shape OCCTUtils_GetFirstType(const TopoDS_Shape &shape, TopAbs_ShapeEnum type);
+
 SV_EXPORT_OPENCASCADE Standard_Boolean OCCTUtils_Contains(const TopTools_ListOfShape& L,
 				 const TopoDS_Shape& S);
 

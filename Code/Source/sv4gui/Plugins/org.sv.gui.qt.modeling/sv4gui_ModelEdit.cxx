@@ -56,7 +56,9 @@
 #include <usModuleRegistry.h>
 
 #include <vtkProperty.h>
+#include <vtkXMLPolyDataReader.h>
 
+#include <QFileDialog>
 #include <QStandardItemModel>
 #include <QInputDialog>
 #include <QColorDialog>
@@ -64,6 +66,9 @@
 #include <QMessageBox>
 #include <QScrollArea>
 #include <QVBoxLayout>
+
+#include <berryIPreferences.h>
+#include <berryPlatform.h>
 
 #include <iostream>
 using namespace std;
@@ -1803,12 +1808,59 @@ void sv4guiModelEdit::ExtractCenterlines()
 
 void sv4guiModelEdit::AdvancedRunDecomp()
 {
-    //if (m_ModelType != "PolyData")
-    //{
-    //  QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
-    //  return;
-    //}
+    if (m_ModelType != "PolyData")
+    {
+      QMessageBox::warning(m_Parent,"Error","Cannot currently extract centerlines of anything other than a PolyData model");
+      return;
+    }
 
+      berry::IPreferencesService* prefService = berry::Platform::GetPreferencesService();
+      berry::IPreferences::Pointer prefs;
+      if (prefService)
+      {
+          prefs = prefService->GetSystemPreferences()->Node("/General");
+      }
+      else
+      {
+          prefs = berry::IPreferences::Pointer(0);
+      }
+
+    // Load centerlines from file
+      QString lastFileOpenPath="";
+      if(prefs.IsNotNull())
+      {
+          lastFileOpenPath = prefs->Get("LastFileOpenPath", "");
+      }
+
+      if(lastFileOpenPath=="")
+          lastFileOpenPath=QDir::homePath();
+
+      QString filter="PolyData (*.vtp)";
+      auto allTypes=sv4guiModelElementFactory::GetAvailableTypes();
+      for(int i=0;i<allTypes.size();i++)
+      {
+          auto exts=sv4guiModelElementFactory::GetFileExtensions(allTypes[i]);
+          if(exts.size()>0)
+          {
+              QString filterType=QString::fromStdString(allTypes[i])+" (";
+              for(int j=0;j<exts.size();j++)
+                  filterType=filterType+" *."+QString::fromStdString(exts[j]);
+
+              filterType+=")";
+              filter=filter+";;"+filterType;
+          }
+      }
+
+      QString centerlinesFilePath = QFileDialog::getOpenFileName(NULL, tr("Load Merged Centerlines")
+                                                           , lastFileOpenPath
+                                                           , tr(filter.toStdString().c_str()));
+
+      vtkSmartPointer<vtkPolyData> centerlinesPd = vtkSmartPointer<vtkPolyData>::New();
+      vtkSmartPointer<vtkXMLPolyDataReader> reader = vtkSmartPointer<vtkXMLPolyDataReader>::New();
+      reader->SetFileName(centerlinesFilePath.toStdString().c_str());
+      reader->Update();
+
+      centerlinesPd->DeepCopy(reader->GetOutput());
     //// Check to make sure merged centerlines exist, complain if not
     //mitk::DataNode::Pointer centerlinesModelNode = this->GetDataStorage()->GetNamedDerivedNode("Merged_Centerlines", m_ModelNode);
 
@@ -1824,8 +1876,7 @@ void sv4guiModelEdit::AdvancedRunDecomp()
     sv4guiModelElement* modelElement=m_Model->GetModelElement(timeStep);
 
     //vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
-    vtkSmartPointer<vtkPolyData> tmpPd = vtkSmartPointer<vtkPolyData>::New();
-    vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, tmpPd);
+    vtkSmartPointer<vtkPolyData> outPd = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesPd);
 
     //sv4guiModelElement* newModelElement = sv4guiModelUtils::RunDecomposition(modelElement, centerlinesSurface->GetVtkPolyData());
 

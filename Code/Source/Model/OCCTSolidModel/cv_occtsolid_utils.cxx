@@ -971,7 +971,7 @@ void OCCTUtils_AnalyzeShape(TopoDS_Shape shape)
 
 }
 // ---------------------
-// OCCTUtils_ShapeFromBSplineSurfaceWithEdge
+// OCCTUtils_ShapeFromBSplineSurfaceWithEdges
 // ---------------------
 int OCCTUtils_ShapeFromBSplineSurfaceWithEdges(const Handle(Geom_BSplineSurface) surface,
     		TopoDS_Shape &shape, std::vector<TopoDS_Edge> edges)
@@ -2233,4 +2233,15 @@ Standard_Boolean OCCTUtils_Contains(const TopTools_ListOfShape& L,
     }
   }
   return Standard_False;
+}
+
+TopoDS_Shape OCCTUtils_GetFirstType(const TopoDS_Shape &shape, TopAbs_ShapeEnum type)
+{
+  if (!shape.IsNull())
+  {
+      TopExp_Explorer it;
+      for (it.Init(shape, type); it.More(); it.Next())
+          return it.Current();
+  }
+  throw std::runtime_error("Couldn't find first object of type");
 }
