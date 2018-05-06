@@ -1546,20 +1546,20 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
     NewEdgeExp.Init(freeWires,TopAbs_EDGE);
     for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
     {
-      //if (surfer == 0)
-      //{
-        if (i != 0)
+      if (surfer == 0)
+      {
+      if (i != 0)
+      {
+        continue;
+      }
+      }
+      else
+      {
+        if (i != 1)
         {
           continue;
         }
-      //}
-      //else
-      //{
-      //  if (i != 1)
-      //  {
-      //    continue;
-      //  }
-      //}
+      }
 
 
       TopoDS_Edge tmpEdge = TopoDS::Edge(NewEdgeExp.Current());
@@ -1567,9 +1567,8 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
       BRepGProp::LinearProperties(tmpEdge,tmpEdgeProps);
       fprintf(stdout,"FULL EDGE PROPS: %.6f\n", tmpEdgeProps.Mass());
 
-      TopLoc_Location tmpEdgeLoc;
       Standard_Real pFirst, pLast;
-      Handle(Geom_Curve) tmpCurve = BRep_Tool::Curve (tmpEdge, tmpEdgeLoc, pFirst, pLast);
+      Handle(Geom_Curve) tmpCurve = BRep_Tool::Curve (tmpEdge, pFirst, pLast);
 
       // Get closest point on curve
       BRepExtrema_DistShapeShape closestPointFinder0(tmpEdge, vertex0);
@@ -1587,9 +1586,10 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
       fprintf(stdout,"ACTUAL CLOSE POINT 1: %.6f %.6f %.6f\n", closestPointFinder1.PointOnShape1(1).X(), closestPointFinder1.PointOnShape1(1).Y(), closestPointFinder1.PointOnShape1(1).Z());
       Standard_Real newParam1;
       closestPointFinder1.ParOnEdgeS1(1, newParam1);
+      fprintf(stdout,"ACTUAL CLOSE PARAMETER 0: %.6f\n", newParam0);
       fprintf(stdout,"ACTUAL CLOSE PARAMETER 1: %.6f\n", newParam1);
 
-      double midValue = (pLast-pFirst)*0.5;
+      double midValue = pFirst + (pLast-pFirst)*0.5;
       gp_Pnt midPoint = tmpCurve->Value(midValue);
 
       if (newParam0 > newParam1)
@@ -1599,48 +1599,81 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
         newParam0 = tmp;
       }
 
+      gp_Pnt paramPoint0 = tmpCurve->Value(newParam0);
+      gp_Pnt paramPoint1 = tmpCurve->Value(newParam1);
+
       BRep_Builder builder;
 
-      TopoDS_Vertex vStart, vEnd, vMiddle;
+      // create two new edges by spliting the original edge
+      TopoDS_Edge newEdge0;// = BRepBuilderAPI_MakeEdge(tmpCurve, pFirst, midValue);
+      TopoDS_Edge newEdge1;// = BRepBuilderAPI_MakeEdge(tmpCurve, midValue, pLast);
+
+      TopoDS_Vertex vStart, vEnd, vMiddle0, vMiddle1;
       vStart = TopExp::FirstVertex(tmpEdge);
       vEnd = TopExp::LastVertex(tmpEdge);
-      builder.MakeVertex(vMiddle, midPoint, Precision::Confusion());
-
-      TopoDS_Edge newEdge0 = BRepBuilderAPI_MakeEdge(tmpCurve, vStart, TopoDS::Vertex(vMiddle.Reversed()));
-      GProp_GProps newEdge0Props;
-      BRepGProp::LinearProperties(newEdge0,newEdge0Props);
-      fprintf(stdout,"EDGE 0 PROPS: %.6f\n", newEdge0Props.Mass());
-
-      TopoDS_Edge newEdge1 = BRepBuilderAPI_MakeEdge(tmpCurve, vMiddle, TopoDS::Vertex(vEnd.Reversed()));
-      GProp_GProps newEdge1Props;
-      BRepGProp::LinearProperties(newEdge1,newEdge1Props);
-      fprintf(stdout,"EDGE 1 PROPS: %.6f\n", newEdge1Props.Mass());
-
-      TopoDS_Edge newEdge2 = BRepBuilderAPI_MakeEdge(tmpCurve, 0.25, 0.5);
-      GProp_GProps newEdge2Props;
-      BRepGProp::LinearProperties(newEdge2,newEdge2Props);
-      fprintf(stdout,"EDGE 2 PROPS: %.6f\n", newEdge2Props.Mass());
+      builder.MakeVertex(vMiddle0, midPoint, Precision::Confusion());
+      builder.MakeVertex(vMiddle1, midPoint, Precision::Confusion());
 
       // Pull together edges 0 and 2
       //
       TopoDS_Wire newWire;
       builder.MakeWire(newWire);
-      newEdge1.Orientation(TopAbs_REVERSED);
+
+      builder.MakeEdge(newEdge0, tmpCurve, Precision::Confusion());
+      vStart.Orientation(TopAbs_FORWARD);
+      builder.Add(newEdge0, vStart);
+      vMiddle0.Orientation(TopAbs_REVERSED);
+      builder.Add(newEdge0, vMiddle0);
+      builder.Range(newEdge0, pFirst, midValue);
+      if (i == 0)
+      {
+        newEdge0.Orientation(TopAbs_REVERSED);
+      }
+
+
+      builder.MakeEdge(newEdge1, tmpCurve, Precision::Confusion());
+      vMiddle1.Orientation(TopAbs_FORWARD);
+      builder.Add(newEdge1, vMiddle1);
+      vEnd.Orientation(TopAbs_REVERSED);
+      builder.Add(newEdge1, vEnd);
+      builder.Range(newEdge1, midValue, pLast);
+      if (i == 0)
+      {
+        newEdge1.Orientation(TopAbs_REVERSED);
+      }
+
+      builder.Add(newWire, newEdge0);
       builder.Add(newWire, newEdge1);
-      newEdge2.Orientation(TopAbs_REVERSED);
-      builder.Add(newWire, newEdge2);
+
+      fprintf(stdout,"CHECING WIRE\n");
+      OCCTUtils_AnalyzeShape(newWire);
+      //if (i == 0)
+      //{
+      //  newEdge2.Orientation(TopAbs_REVERSED);
+      //}
+      //builder.Add(newWire, newEdge2);
 
       TopoDS_Face face = TopoDS::Face(OCCTUtils_GetFirstType(*(loftedSurfs[surfer]->geom_), TopAbs_FACE));
 
-      builder.UpdateEdge(newEdge1, new Geom2d_Line(gp_Pnt2d(0.0, 0.0), gp_Dir2d(1,0)), face, Precision::Confusion());
-      builder.Range(newEdge1, face, 0, pFirst + (pLast-pFirst)/2);
-      builder.UpdateEdge(newEdge2, new Geom2d_Line(gp_Pnt2d(0.0, 0.0), gp_Dir2d(1,0)), face, Precision::Confusion());
-      builder.Range(newEdge2, face, pFirst + (pLast-pFirst)/2, pLast);
+      builder.UpdateEdge(newEdge0, new Geom2d_Line(gp_Pnt2d(0.0, i), gp_Dir2d(1,0)), face, Precision::Confusion());
+      builder.Range(newEdge0, face, pFirst, midValue);
+      builder.UpdateEdge(newEdge1, new Geom2d_Line(gp_Pnt2d(0.0, i), gp_Dir2d(1,0)), face, Precision::Confusion());
+      builder.Range(newEdge1, face, midValue, pLast);
+
+      //builder.UpdateEdge(newEdge0, new Geom2d_Line(gp_Pnt2d(0.0, i), gp_Dir2d(1,0)), face, Precision::Confusion());
+      //builder.Range(newEdge0, face, pFirst, newParam0);
+      //builder.UpdateEdge(newEdge1, new Geom2d_Line(gp_Pnt2d(0.0, i), gp_Dir2d(1,0)), face, Precision::Confusion());
+      //builder.Range(newEdge1, face, newParam0, newParam1);
+      //builder.UpdateEdge(newEdge2, new Geom2d_Line(gp_Pnt2d(0.0, i), gp_Dir2d(1,0)), face, Precision::Confusion());
+      //builder.Range(newEdge2, face, newParam1, pLast);
 
       Handle(ShapeBuild_ReShape) context = new ShapeBuild_ReShape();
       context->Replace(tmpEdge, newWire);
       TopoDS_Shape newShape = context->Apply(*(loftedSurfs[surfer]->geom_));
-      //*(loftedSurfs[surfer]->geom_) = newShape;
+
+      ShapeFix_Shape shapeFixer(newShape);
+      shapeFixer.Perform();
+      newShape = shapeFixer.Shape();
 
       TopExp_Explorer edgeExp;
       edgeExp.Init(*(loftedSurfs[surfer]->geom_), TopAbs_EDGE);
@@ -1650,40 +1683,103 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
         TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
 
         Standard_Real paraFirst, paraLast;
-        BRep_Tool::Range(thisEdge, face, paraFirst, paraLast);
+        Handle(Geom_Curve) thisCurve = BRep_Tool::Curve (thisEdge, paraFirst, paraLast);
+        Standard_Real faceFirst, faceLast;
+        Handle(Geom2d_Curve) aPCurve = BRep_Tool::CurveOnSurface (thisEdge, face, faceFirst, faceLast);
 
+        fprintf(stdout,"EDGE %d HAS ORIEN %d\n", r, thisEdge.Orientation());
         fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+        fprintf(stdout,"EDGE %d HAS RANGE ON FACE %.6f %.6f\n", r, faceFirst, faceLast);
 
         gp_Pnt2d pntFirst, pntLast;
         BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
 
         fprintf(stdout,"EDGE %d HAS STARTING UV VALUE: %.6f %.6f\n", r, pntFirst.X(), pntFirst.Y());
         fprintf(stdout,"EDGE %d HAS ENDERING UV VALUE: %.6f %.6f\n", r, pntLast.X(), pntLast.Y());
+
+
+        vtkNew(vtkPoints, writePoints);
+        for (int s=0; s<20; s++)
+        {
+          Standard_Real pointVal = paraFirst + (s/20.)*(paraLast-paraFirst);
+          gp_Pnt writePoint = thisCurve->Value(pointVal);
+
+          writePoints->InsertNextPoint(writePoint.X(), writePoint.Y(), writePoint.Z());
+        }
+
+        vtkNew(vtkPolyData, writePointsPd);
+        writePointsPd->SetPoints(writePoints);
+
+        std::string fn = "/Users/adamupdegrove/Desktop/tmp/BEFOREEDGES_"+std::to_string(surfer)+"_"+std::to_string(r)+".vtp";
+        vtkSVIOUtils::WriteVTPFile(fn, writePointsPd);
       }
 
-          edgeExp.Init(newShape, TopAbs_EDGE);
+      face = TopoDS::Face(OCCTUtils_GetFirstType(newShape, TopAbs_FACE));
+      fprintf(stdout,"CHECK FACE\n");
+      OCCTUtils_AnalyzeShape(face);
 
-          fprintf(stdout,"\n");
-          fprintf(stdout,"NEW EDGES: \n");
-          int numEdges = 0;
-          for (int r=0; edgeExp.More(); edgeExp.Next(), r++)
-          {
-            TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
+      edgeExp.Init(newShape, TopAbs_EDGE);
 
-            Standard_Real paraFirst, paraLast;
-            BRep_Tool::Range(thisEdge, face, paraFirst, paraLast);
+      fprintf(stdout,"\n");
+      fprintf(stdout,"NEW EDGES: \n");
+      int numEdges = 0;
+      for (int r=0; edgeExp.More(); edgeExp.Next(), r++)
+      {
+        TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
 
-            fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+        Standard_Real paraFirst, paraLast;
+        Handle(Geom_Curve) thisCurve = BRep_Tool::Curve (thisEdge, paraFirst, paraLast);
+        Standard_Real faceFirst, faceLast;
+        Handle(Geom2d_Curve) aPCurve = BRep_Tool::CurveOnSurface (thisEdge, face, faceFirst, faceLast);
 
-            gp_Pnt2d pntFirst, pntLast;
-            BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
+        fprintf(stdout,"EDGE %d HAS ORIEN %d\n", r, thisEdge.Orientation());
+        fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+        fprintf(stdout,"EDGE %d HAS RANGE ON FACE %.6f %.6f\n", r, faceFirst, faceLast);
 
-            fprintf(stdout,"EDGE %d HAS STARTING UV VALUE: %.6f %.6f\n", r, pntFirst.X(), pntFirst.Y());
-            fprintf(stdout,"EDGE %d HAS ENDERING UV VALUE: %.6f %.6f\n", r, pntLast.X(), pntLast.Y());
+        gp_Pnt2d pntFirst, pntLast;
+        BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
 
-            numEdges++;
-          }
-          fprintf(stdout,"TOT NUM OF EDGES: %d\n", numEdges);
+        fprintf(stdout,"EDGE %d HAS STARTING UV VALUE: %.6f %.6f\n", r, pntFirst.X(), pntFirst.Y());
+        fprintf(stdout,"EDGE %d HAS ENDERING UV VALUE: %.6f %.6f\n", r, pntLast.X(), pntLast.Y());
+
+        numEdges++;
+
+        vtkNew(vtkPoints, writePoints);
+        for (int s=0; s<20; s++)
+        {
+          Standard_Real pointVal = paraFirst + (s/20.)*(paraLast-paraFirst);
+          gp_Pnt writePoint = thisCurve->Value(pointVal);
+
+          writePoints->InsertNextPoint(writePoint.X(), writePoint.Y(), writePoint.Z());
+        }
+
+        vtkNew(vtkPolyData, writePointsPd);
+        writePointsPd->SetPoints(writePoints);
+
+        std::string fn = "/Users/adamupdegrove/Desktop/tmp/AFTEREEDGES_"+std::to_string(surfer)+"_"+std::to_string(r)+".vtp";
+        vtkSVIOUtils::WriteVTPFile(fn, writePointsPd);
+
+        fprintf(stdout,"ANALYZING EDGE\n");
+        OCCTUtils_AnalyzeShape(thisEdge);
+
+        //TopExp_Explorer vertexExp;
+        //vertexExp.Init(thisEdge, TopAbs_VERTEX);
+        //fprintf(stdout,"\n");
+        //for (int l=0; vertexExp.More(); vertexExp.Next(), l++)
+        //{
+        //  TopoDS_Vertex thisVertex = TopoDS::Vertex(vertexExp.Current());
+        //  gp_Pnt thisVertexPoint = BRep_Tool::Pnt(thisVertex);
+        //  fprintf(stdout,"THIS VERTEX POSITION: %.6f %.6f %.6f\n", thisVertexPoint.X(), thisVertexPoint.Y(), thisVertexPoint.Z());
+
+        //  fprintf(stdout, "POINT %d ORIEN: %d\n", l, thisVertex.Orientation());
+        //}
+
+      }
+      fprintf(stdout,"TOT NUM OF EDGES: %d\n", numEdges);
+
+
+      *(loftedSurfs[surfer]->geom_) = newShape;
+      OCCTUtils_AnalyzeShape(*(loftedSurfs[surfer]->geom_));
 
       //try
       //{
@@ -1702,9 +1798,13 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
       //      TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
 
       //      Standard_Real paraFirst, paraLast;
-      //      BRep_Tool::Range(thisEdge, face, paraFirst, paraLast);
+      //      Handle(Geom_Curve) thisCurve = BRep_Tool::Curve (thisEdge, paraFirst, paraLast);
+      //      Standard_Real faceFirst, faceLast;
+      //      Handle(Geom2d_Curve) aPCurve = BRep_Tool::CurveOnSurface (thisEdge, face, faceFirst, faceLast);
 
+      //      fprintf(stdout,"EDGE %d HAS ORIEN %d\n", r, thisEdge.Orientation());
       //      fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+      //      fprintf(stdout,"EDGE %d HAS RANGE ON FACE %.6f %.6f\n", r, faceFirst, faceLast);
 
       //      gp_Pnt2d pntFirst, pntLast;
       //      BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
@@ -1743,6 +1843,7 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
       //    context->Replace(edge, wire);
       //    TopoDS_Shape output = context->Apply(cyl);
       //    *(loftedSurfs[surfer]->geom_) = output;
+      //    OCCTUtils_AnalyzeShape(*(loftedSurfs[surfer]->geom_));
 
       //    edgeExp.Init(output, TopAbs_EDGE);
 
@@ -1754,9 +1855,13 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
       //      TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
 
       //      Standard_Real paraFirst, paraLast;
-      //      BRep_Tool::Range(thisEdge, face, paraFirst, paraLast);
+      //      Handle(Geom_Curve) thisCurve = BRep_Tool::Curve (thisEdge, paraFirst, paraLast);
+      //      Standard_Real faceFirst, faceLast;
+      //      Handle(Geom2d_Curve) aPCurve = BRep_Tool::CurveOnSurface (thisEdge, face, faceFirst, faceLast);
 
+      //      fprintf(stdout,"EDGE %d HAS ORIEN %d\n", r, thisEdge.Orientation());
       //      fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+      //      fprintf(stdout,"EDGE %d HAS RANGE ON FACE %.6f %.6f\n", r, faceFirst, faceLast);
 
       //      gp_Pnt2d pntFirst, pntLast;
       //      BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
@@ -1785,7 +1890,6 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
   // =====================================================================
 
   cvOCCTSolidModel* sewSolid=loftedSurfs[0];
-  OCCTUtils_AnalyzeShape(*(sewSolid->geom_));
 
   ////// CREATE USING SEWING
   ////fprintf(stdout,"SEWING\n");
