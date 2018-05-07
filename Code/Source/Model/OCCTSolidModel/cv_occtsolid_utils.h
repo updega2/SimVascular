@@ -147,7 +147,11 @@ SV_EXPORT_OPENCASCADE TopoDS_Shape OCCTUtils_GetFirstType(const TopoDS_Shape &sh
 SV_EXPORT_OPENCASCADE Standard_Boolean OCCTUtils_Contains(const TopTools_ListOfShape& L,
 				 const TopoDS_Shape& S);
 
-SV_EXPORT_OPENCASCADE void OCCTUtils_AnalyzeShape(TopoDS_Shape shape);
+SV_EXPORT_OPENCASCADE int OCCTUtils_AnalyzeShape(TopoDS_Shape shape);
+
+SV_EXPORT_OPENCASCADE int OCCTUtils_GetOpenEdge(TopoDS_Shape &shape, const int edgeNumber, TopoDS_Edge &edge);
+
+SV_EXPORT_OPENCASCADE int OCCTUtils_SplitEdgeOnShapeNearPoints(TopoDS_Shape &shape, const int edgeNumber, vtkPoints *points);
 
 /* -------- */
 /* Helpers for loft */

@@ -64,6 +64,7 @@
 #include "BRepCheck_Solid.hxx"
 #include "BRepCheck_ListOfStatus.hxx"
 #include "BRepCheck_ListIteratorOfListOfStatus.hxx"
+#include "BRepExtrema_DistShapeShape.hxx"
 #include "BRep_Tool.hxx"
 #include "BRep_Builder.hxx"
 #include "BRepFill_Filling.hxx"
@@ -90,6 +91,7 @@
 #include "TNaming_Builder.hxx"
 
 #include "ShapeAnalysis_Surface.hxx"
+#include "ShapeBuild_ReShape.hxx"
 #include "ShapeFix_FreeBounds.hxx"
 #include "ShapeFix_Shape.hxx"
 
@@ -809,7 +811,7 @@ int OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(const Handle(Geom_BSplineSur
   return SV_OK;
 }
 
-void OCCTUtils_AnalyzeShape(TopoDS_Shape shape)
+int OCCTUtils_AnalyzeShape(TopoDS_Shape shape)
 {
   std::cout<<"Analyzing Shape"<<endl;
   Handle(TopTools_HSequenceOfShape) sl,slv,sle,slw,slf,sls,slo;
@@ -825,151 +827,266 @@ void OCCTUtils_AnalyzeShape(TopoDS_Shape shape)
   TopTools_DataMapOfShapeListOfShape theMap;
   OCCTUtils_GetProblemShapes(analyzer, shape, sl, NbProblems, theMap);
 
+  int isProblem = 0;
+
   Standard_Integer aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidPointOnCurve);
   if(NbProblems->Value(aProblemID) > 0)
+  {
     std::cout<<"  Invalid Point on Curve ................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidPointOnCurveOnSurface);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Point on CurveOnSurface .......... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidPointOnSurface);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Point on Surface ................. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_No3DCurve);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  No 3D Curve .............................. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_Multiple3DCurve);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Multiple 3D Curve ........................ "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_Invalid3DCurve);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid 3D Curve ......................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_NoCurveOnSurface);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  No Curve on Surface ...................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidCurveOnSurface);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Curve on Surface ................. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidCurveOnClosedSurface);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Curve on closed Surface .......... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidSameRangeFlag);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid SameRange Flag ................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidSameParameterFlag);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid SameParameter Flag ............... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidDegeneratedFlag);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Degenerated Flag ................. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_FreeEdge);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Free Edge ................................ "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidMultiConnexity);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid MultiConnexity ................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidRange);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Range ............................ "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_EmptyWire);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Empty Wire ............................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_RedundantEdge);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Redundant Edge ........................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_SelfIntersectingWire);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Self Intersecting Wire ................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_NoSurface);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  No Surface ............................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidWire);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Wire ............................. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_RedundantWire);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Redundant Wire ........................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_IntersectingWires);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Intersecting Wires ....................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidImbricationOfWires);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Imbrication of Wires ............. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_EmptyShell);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Empty Shell .............................. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_RedundantFace);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Redundant Face ........................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_UnorientableShape);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Unorientable Shape ....................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
+  // Not considering this a problem in case we have open shape
   aProblemID = static_cast<Standard_Integer>(BRepCheck_NotClosed);
   if(NbProblems->Value(aProblemID)>0)
     std::cout<<"  Not Closed ............................... "<<NbProblems->Value(aProblemID)<<"\n";
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_NotConnected);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Not Connected ............................ "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_SubshapeNotInShape);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Subshape not in Shape .................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_BadOrientation);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Bad Orientation .......................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_BadOrientationOfSubshape);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Bad Orientation of Subshape .............. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidToleranceValue);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid tolerance value................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidPolygonOnTriangulation);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid polygon on triangulation.......... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_InvalidImbricationOfShells);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Invalid Imbrication of Shells............. "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
  aProblemID = static_cast<Standard_Integer>(BRepCheck_EnclosedRegion);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  Enclosed Region........................... "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
   aProblemID = static_cast<Standard_Integer>(BRepCheck_CheckFail);
   if(NbProblems->Value(aProblemID)>0)
+  {
     std::cout<<"  checkshape failure........................ "<<NbProblems->Value(aProblemID)<<"\n";
+    isProblem = 1;
+  }
 
+  if (isProblem)
+  {
+    return SV_ERROR;
+  }
+
+  return SV_OK;
 }
+
 // ---------------------
 // OCCTUtils_ShapeFromBSplineSurfaceWithEdges
 // ---------------------
@@ -2244,4 +2361,392 @@ TopoDS_Shape OCCTUtils_GetFirstType(const TopoDS_Shape &shape, TopAbs_ShapeEnum 
           return it.Current();
   }
   throw std::runtime_error("Couldn't find first object of type");
+}
+
+// ---------------------
+// OCCTUtils_SplitEdgeOnShapeNearPoints
+// ---------------------
+/**
+ * @brief
+ * @param
+ * @return SV_OK if function completes properly
+ */
+int OCCTUtils_SplitEdgeOnShapeNearPoints(TopoDS_Shape &shape, const int edgeNumber, vtkPoints *points)
+{
+  int numSplitPoints = points->GetNumberOfPoints();
+
+  if (numSplitPoints == 0)
+  {
+    std::cout << "No points given" << endl;
+    return SV_ERROR;
+  }
+
+  TopoDS_Edge edge;
+  if (OCCTUtils_GetOpenEdge(shape, edgeNumber, edge) != SV_OK)
+  {
+    std::cout << "Failed getting open edge on shape" << endl;
+    return SV_ERROR;
+  }
+
+  try
+  {
+    // Get curve from edge
+    Standard_Real pFirst, pLast;
+    Handle(Geom_Curve) curve = BRep_Tool::Curve (edge, pFirst, pLast);
+
+    // Loop through points and get all param split locations
+    double pt[3];
+    std::vector<double> splitParams(numSplitPoints);
+    for (int i=0; i<numSplitPoints; i++)
+    {
+      // Get vertex
+      points->GetPoint(i, pt);
+      gp_Pnt occtPnt(pt[0], pt[1], pt[2]);
+      TopoDS_Vertex vertex = BRepBuilderAPI_MakeVertex(occtPnt);
+
+      // Get closest point on curve
+      BRepExtrema_DistShapeShape closestPointFinder(edge, vertex);
+      closestPointFinder.Perform();
+
+      //fprintf(stdout,"ACTUAL CLOSE POINT 0: %.6f %.6f %.6f\n", closestPointFinder.PointOnShape1(1).X(), closestPointFinder.PointOnShape1(1).Y(), closestPointFinder.PointOnShape1(1).Z());
+
+      Standard_Real newParam;
+      closestPointFinder.ParOnEdgeS1(1, newParam);
+      splitParams[i] = newParam;
+      //fprintf(stdout,"ACTUAL CLOSE PARAMETER 0: %.6f\n", newParam);
+    }
+
+    // Order the params so that we split in order
+    std::sort(splitParams.begin(), splitParams.end());
+
+    int numFullPoints = numSplitPoints+2;
+    std::vector<double> fullSplitParams(numFullPoints);
+    fullSplitParams[0] = pFirst;
+    for (int i=0; i<numSplitPoints; i++)
+    {
+      fullSplitParams[i+1] = splitParams[i];
+    }
+    fullSplitParams[numFullPoints-1] = pLast;
+
+    // Start and end vertices
+    TopoDS_Vertex vStart, vEnd;
+    vStart = TopExp::FirstVertex(edge);
+    vEnd = TopExp::LastVertex(edge);
+
+    // Construct new split edge with builder
+    BRep_Builder builder;
+
+    // Get  vertices
+    std::vector<TopoDS_Vertex> vParams(numFullPoints);
+    vParams[0] = vStart;
+    for (int i=0; i<splitParams.size(); i++)
+    {
+      gp_Pnt tmpPnt = curve->Value(splitParams[i]);
+      builder.MakeVertex(vParams[i+1], tmpPnt, Precision::Confusion());
+    }
+    vParams[numFullPoints-1] = vEnd;
+
+    // Stitch together all edges
+    TopoDS_Wire newWire;
+    builder.MakeWire(newWire);
+
+    // create new edges
+    int numSplitEdges = numSplitPoints+1;
+    std::vector<TopoDS_Edge> newEdges(numSplitEdges);
+
+    // build up new edges
+    for (int i=0; i<numSplitEdges; i++)
+    {
+      builder.MakeEdge(newEdges[i], curve, Precision::Confusion());
+      vParams[i].Orientation(TopAbs_FORWARD);
+      builder.Add(newEdges[i], vParams[i]);
+      vParams[i+1].Orientation(TopAbs_REVERSED);
+      builder.Add(newEdges[i], vParams[i+1]);
+      builder.Range(newEdges[i], fullSplitParams[i], fullSplitParams[i+1]);
+      newEdges[i].Orientation(edge.Orientation());
+    }
+
+    // add edges
+    for (int i=0; i<numSplitEdges; i++)
+    {
+      builder.Add(newWire, newEdges[i]);
+    }
+
+    fprintf(stdout,"CHECKING WIRE\n");
+    if (OCCTUtils_AnalyzeShape(newWire) != SV_OK)
+    {
+      std::cerr << "Error forming new wire" << endl;
+      return SV_ERROR;
+    }
+
+    // Assuming there is only one face. If there are multiple, this needs to be changed
+    TopoDS_Face face = TopoDS::Face(OCCTUtils_GetFirstType(shape, TopAbs_FACE));
+
+    // UV points of edge
+    gp_Pnt2d pntFirst, pntLast;
+    BRep_Tool::UVPoints(edge, face, pntFirst, pntLast);
+
+    // Add pcurves for all edges
+    // Assuming that the edge wraps around in U, need to modify if edge goes the other way
+    for (int i=0; i<numSplitEdges; i++)
+    {
+      builder.UpdateEdge(newEdges[i], new Geom2d_Line(gp_Pnt2d(pntFirst.X(), pntFirst.Y()), gp_Dir2d(1,0)), face, Precision::Confusion());
+      builder.Range(newEdges[i], face, fullSplitParams[i], fullSplitParams[i+1]);
+    }
+
+    // Now replace edge with split edge
+    Handle(ShapeBuild_ReShape) context = new ShapeBuild_ReShape();
+    context->Replace(edge, newWire);
+    TopoDS_Shape newShape = context->Apply(shape);
+
+    if (OCCTUtils_AnalyzeShape(newShape) != SV_OK)
+    {
+      std::cerr << "Issue with shape after edge split" << endl;
+      return SV_ERROR;
+    }
+
+    //TopExp_Explorer edgeExp;
+    //edgeExp.Init(*(loftedSurfs[surfer]->geom_), TopAbs_EDGE);
+
+    //for (int r=0; edgeExp.More(); edgeExp.Next(), r++)
+    //{
+    //  TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
+
+    //  Standard_Real paraFirst, paraLast;
+    //  Handle(Geom_Curve) thisCurve = BRep_Tool::Curve (thisEdge, paraFirst, paraLast);
+    //  Standard_Real faceFirst, faceLast;
+    //  Handle(Geom2d_Curve) aPCurve = BRep_Tool::CurveOnSurface (thisEdge, face, faceFirst, faceLast);
+
+    //  fprintf(stdout,"EDGE %d HAS ORIEN %d\n", r, thisEdge.Orientation());
+    //  fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+    //  fprintf(stdout,"EDGE %d HAS RANGE ON FACE %.6f %.6f\n", r, faceFirst, faceLast);
+
+    //  gp_Pnt2d pntFirst, pntLast;
+    //  BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
+
+    //  fprintf(stdout,"EDGE %d HAS STARTING UV VALUE: %.6f %.6f\n", r, pntFirst.X(), pntFirst.Y());
+    //  fprintf(stdout,"EDGE %d HAS ENDERING UV VALUE: %.6f %.6f\n", r, pntLast.X(), pntLast.Y());
+
+
+    //  vtkNew(vtkPoints, writePoints);
+    //  for (int s=0; s<20; s++)
+    //  {
+    //    Standard_Real pointVal = paraFirst + (s/20.)*(paraLast-paraFirst);
+    //    gp_Pnt writePoint = thisCurve->Value(pointVal);
+
+    //    writePoints->InsertNextPoint(writePoint.X(), writePoint.Y(), writePoint.Z());
+    //  }
+
+    //  vtkNew(vtkPolyData, writePointsPd);
+    //  writePointsPd->SetPoints(writePoints);
+
+    //  std::string fn = "/Users/adamupdegrove/Desktop/tmp/BEFOREEDGES_"+std::to_string(surfer)+"_"+std::to_string(r)+".vtp";
+    //  vtkSVIOUtils::WriteVTPFile(fn, writePointsPd);
+    //}
+
+    //edgeExp.Init(newShape, TopAbs_EDGE);
+
+    //fprintf(stdout,"\n");
+    //fprintf(stdout,"NEW EDGES: \n");
+    //int numEdges = 0;
+    //for (int r=0; edgeExp.More(); edgeExp.Next(), r++)
+    //{
+    //  TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
+
+    //  Standard_Real paraFirst, paraLast;
+    //  Handle(Geom_Curve) thisCurve = BRep_Tool::Curve (thisEdge, paraFirst, paraLast);
+    //  Standard_Real faceFirst, faceLast;
+    //  Handle(Geom2d_Curve) aPCurve = BRep_Tool::CurveOnSurface (thisEdge, face, faceFirst, faceLast);
+
+    //  fprintf(stdout,"EDGE %d HAS ORIEN %d\n", r, thisEdge.Orientation());
+    //  fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+    //  fprintf(stdout,"EDGE %d HAS RANGE ON FACE %.6f %.6f\n", r, faceFirst, faceLast);
+
+    //  gp_Pnt2d pntFirst, pntLast;
+    //  BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
+
+    //  fprintf(stdout,"EDGE %d HAS STARTING UV VALUE: %.6f %.6f\n", r, pntFirst.X(), pntFirst.Y());
+    //  fprintf(stdout,"EDGE %d HAS ENDERING UV VALUE: %.6f %.6f\n", r, pntLast.X(), pntLast.Y());
+
+    //  numEdges++;
+
+    //  vtkNew(vtkPoints, writePoints);
+    //  for (int s=0; s<20; s++)
+    //  {
+    //    Standard_Real pointVal = paraFirst + (s/20.)*(paraLast-paraFirst);
+    //    gp_Pnt writePoint = thisCurve->Value(pointVal);
+
+    //    writePoints->InsertNextPoint(writePoint.X(), writePoint.Y(), writePoint.Z());
+    //  }
+
+    //  vtkNew(vtkPolyData, writePointsPd);
+    //  writePointsPd->SetPoints(writePoints);
+
+    //  std::string fn = "/Users/adamupdegrove/Desktop/tmp/AFTEREEDGES_"+std::to_string(surfer)+"_"+std::to_string(r)+".vtp";
+    //  vtkSVIOUtils::WriteVTPFile(fn, writePointsPd);
+
+    //  fprintf(stdout,"ANALYZING EDGE\n");
+    //  OCCTUtils_AnalyzeShape(thisEdge);
+
+    //  //TopExp_Explorer vertexExp;
+    //  //vertexExp.Init(thisEdge, TopAbs_VERTEX);
+    //  //fprintf(stdout,"\n");
+    //  //for (int l=0; vertexExp.More(); vertexExp.Next(), l++)
+    //  //{
+    //  //  TopoDS_Vertex thisVertex = TopoDS::Vertex(vertexExp.Current());
+    //  //  gp_Pnt thisVertexPoint = BRep_Tool::Pnt(thisVertex);
+    //  //  fprintf(stdout,"THIS VERTEX POSITION: %.6f %.6f %.6f\n", thisVertexPoint.X(), thisVertexPoint.Y(), thisVertexPoint.Z());
+
+    //  //  fprintf(stdout, "POINT %d ORIEN: %d\n", l, thisVertex.Orientation());
+    //  //}
+
+    //}
+    //fprintf(stdout,"TOT NUM OF EDGES: %d\n", numEdges);
+
+    shape = newShape;
+
+    //Standard_Real length = 8.0;
+    //Standard_Real radius = 2.0;
+    //TopoDS_Solid cyl = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(0.0, 0.0, 0.1)), radius, length).Solid();
+
+    //TopoDS_Face face = TopoDS::Face(OCCTUtils_GetFirstType(cyl, TopAbs_FACE));
+    //TopoDS_Edge edge = TopoDS::Edge(OCCTUtils_GetFirstType(cyl, TopAbs_EDGE));
+
+    //TopExp_Explorer edgeExp;
+    //edgeExp.Init(cyl, TopAbs_EDGE);
+
+    //for (int r=0; edgeExp.More(); edgeExp.Next(), r++)
+    //{
+    //  TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
+
+    //  Standard_Real paraFirst, paraLast;
+    //  Handle(Geom_Curve) thisCurve = BRep_Tool::Curve (thisEdge, paraFirst, paraLast);
+    //  Standard_Real faceFirst, faceLast;
+    //  Handle(Geom2d_Curve) aPCurve = BRep_Tool::CurveOnSurface (thisEdge, face, faceFirst, faceLast);
+
+    //  fprintf(stdout,"EDGE %d HAS ORIEN %d\n", r, thisEdge.Orientation());
+    //  fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+    //  fprintf(stdout,"EDGE %d HAS RANGE ON FACE %.6f %.6f\n", r, faceFirst, faceLast);
+
+    //  gp_Pnt2d pntFirst, pntLast;
+    //  BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
+
+    //  fprintf(stdout,"EDGE %d HAS STARTING UV VALUE: %.6f %.6f\n", r, pntFirst.X(), pntFirst.Y());
+    //  fprintf(stdout,"EDGE %d HAS ENDERING UV VALUE: %.6f %.6f\n", r, pntLast.X(), pntLast.Y());
+    //}
+
+    //BRep_Builder builder;
+
+    //Standard_Real pFirst, pLast;
+    //Handle(Geom_Curve) curve = BRep_Tool::Curve(edge, pFirst, pLast);
+    //gp_Pnt midPoint = curve->Value(pFirst + (pLast-pFirst)/2);
+
+    //TopoDS_Vertex vStart, vEnd, vMiddle;
+    //vStart = TopExp::FirstVertex(edge);
+    //vEnd = TopExp::LastVertex(edge);
+    //builder.MakeVertex(vMiddle, midPoint, Precision::Confusion());
+
+    //TopoDS_Edge newEdge1 = BRepBuilderAPI_MakeEdge(curve, vStart, TopoDS::Vertex(vMiddle.Reversed()));
+    //TopoDS_Edge newEdge2 = BRepBuilderAPI_MakeEdge(curve, vMiddle, TopoDS::Vertex(vEnd.Reversed()));
+
+    //TopoDS_Wire wire;
+    //builder.MakeWire(wire);
+    //newEdge1.Orientation(TopAbs_REVERSED);
+    //builder.Add(wire, newEdge1);
+    //newEdge2.Orientation(TopAbs_REVERSED);
+    //builder.Add(wire, newEdge2);
+
+    //builder.UpdateEdge(newEdge1, new Geom2d_Line(gp_Pnt2d(0.0, length), gp_Dir2d(1,0)), face, Precision::Confusion());
+    //builder.Range(newEdge1, face, 0, pFirst + (pLast-pFirst)/2);
+    //builder.UpdateEdge(newEdge2, new Geom2d_Line(gp_Pnt2d(0.0, length), gp_Dir2d(1,0)), face, Precision::Confusion());
+    //builder.Range(newEdge2, face, pFirst + (pLast-pFirst)/2, pLast);
+
+    //Handle(ShapeBuild_ReShape) context = new ShapeBuild_ReShape();
+    //context->Replace(edge, wire);
+    //TopoDS_Shape output = context->Apply(cyl);
+    //*(loftedSurfs[surfer]->geom_) = output;
+    //OCCTUtils_AnalyzeShape(*(loftedSurfs[surfer]->geom_));
+
+    //edgeExp.Init(output, TopAbs_EDGE);
+
+    //fprintf(stdout,"\n");
+    //fprintf(stdout,"NEW EDGES: \n");
+    //int numEdges = 0;
+    //for (int r=0; edgeExp.More(); edgeExp.Next(), r++)
+    //{
+    //  TopoDS_Edge thisEdge = TopoDS::Edge(edgeExp.Current());
+
+    //  Standard_Real paraFirst, paraLast;
+    //  Handle(Geom_Curve) thisCurve = BRep_Tool::Curve (thisEdge, paraFirst, paraLast);
+    //  Standard_Real faceFirst, faceLast;
+    //  Handle(Geom2d_Curve) aPCurve = BRep_Tool::CurveOnSurface (thisEdge, face, faceFirst, faceLast);
+
+    //  fprintf(stdout,"EDGE %d HAS ORIEN %d\n", r, thisEdge.Orientation());
+    //  fprintf(stdout,"EDGE %d HAS RANGE %.6f %.6f\n", r, paraFirst, paraLast);
+    //  fprintf(stdout,"EDGE %d HAS RANGE ON FACE %.6f %.6f\n", r, faceFirst, faceLast);
+
+    //  gp_Pnt2d pntFirst, pntLast;
+    //  BRep_Tool::UVPoints(thisEdge, face, pntFirst, pntLast);
+
+    //  fprintf(stdout,"EDGE %d HAS STARTING UV VALUE: %.6f %.6f\n", r, pntFirst.X(), pntFirst.Y());
+    //  fprintf(stdout,"EDGE %d HAS ENDERING UV VALUE: %.6f %.6f\n", r, pntLast.X(), pntLast.Y());
+
+    //  numEdges++;
+    //}
+    //fprintf(stdout,"TOT NUM OF EDGES: %d\n", numEdges);
+
+    //std::cout << std::endl << "Program finished normally" << std::endl;
+  }
+  catch (Standard_Failure)
+  {
+    Handle_Standard_Failure e = Standard_Failure::Caught();
+    std::cout << "OCC Error: " << e->GetMessageString() << std::endl;
+    return SV_ERROR;
+  }
+  catch (const std::exception &error)
+  {
+    std::cout << "Error: " << error.what() << std::endl;
+    return SV_ERROR;
+  }
+
+  return SV_OK;
+}
+
+// ---------------------
+// OCCTUtils_GetOpenEdge
+// ---------------------
+/**
+ * @brief
+ * @param
+ * @return SV_OK if function completes properly
+ */
+int OCCTUtils_GetOpenEdge(TopoDS_Shape &shape, const int edgeNumber, TopoDS_Edge &edge)
+{
+  Standard_Real sewtoler =  1.e-6;
+  Standard_Real closetoler =  1.e-4;
+  ShapeFix_FreeBounds findFree(shape,sewtoler,closetoler,
+            Standard_False,Standard_False);
+  TopoDS_Compound freeWires = findFree.GetClosedWires();
+  TopExp_Explorer NewEdgeExp;
+  NewEdgeExp.Init(freeWires,TopAbs_EDGE);
+
+  int foundEdge = 0;
+  int numEdges = 0;
+  for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
+  {
+    if (i == edgeNumber)
+    {
+      edge = TopoDS::Edge(NewEdgeExp.Current());
+      foundEdge = 1;
+      break;
+    }
+    numEdges++;
+  }
+
+  if (!foundEdge)
+  {
+    std::cerr << "Error getting edge " << edgeNumber << " off of shape. There are only " << numEdges << " open edges on the shape.";
+  }
+
+  return SV_OK;
 }

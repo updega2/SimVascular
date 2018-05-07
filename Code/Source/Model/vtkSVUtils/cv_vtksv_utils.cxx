@@ -73,6 +73,8 @@
 #include "vtkSVSurfaceCenterlineGrouper.h"
 #include "vtkSVSurfaceCuboidPatcher.h"
 
+#include "cv_occtsolid_utils.h"
+
 #define vtkNew(type,name) \
   vtkSmartPointer<type> name = vtkSmartPointer<type>::New()
 
@@ -233,19 +235,60 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
     if (vtkSVGeneralUtils::CheckArrayExists(polycubeUg, 1, "GroupIds") != SV_OK)
     {
       std::cerr << "Group Ids Array with name GroupIds does not exist on volume polycube" << endl;
-      return SV_OK;
+      return SV_ERROR;
     }
 
     if (vtkSVGeneralUtils::CheckArrayExists(polycubeUg, 0, "GridIds") != SV_OK)
     {
       std::cerr << "Grid point ids array with name GridIds does not exist on volume polycube" << endl;
-      return SV_OK;
+      return SV_ERROR;
     }
 
-    vtkNew(vtkPoints, savePoints);
+    // Get regions of group ids, so that we can get critical points splitting groups
+    std::vector<Region> groupRegions;
+    if (vtkSVGeneralUtils::GetRegions(geom, "GroupIds", groupRegions) != SV_OK)
+    {
+      std::cerr << "Error gettring groups of input surface" << endl;
+      return SV_ERROR;
+    }
+
+    vtkNew(vtkIdList, frontNeighbors);
+    vtkNew(vtkIdList, backNeighbors);
+    vtkNew(vtkIdList, frontGroupNeighbors);
+    vtkNew(vtkIdList, backGroupNeighbors);
     for (int i=0; i<numGroups; i++)
     {
       int groupId = groupIds->GetId(i);
+
+      if (!(groupId == 2 || groupId == 6))
+      {
+        continue;
+      }
+
+      // Get centerline info
+      vtkIdType nlinepts, *linepts;
+      int centerlineId = centerlines->GetCellData()->GetArray("GroupIds")->LookupValue(groupId);
+      centerlines->GetCellPoints(centerlineId, nlinepts, linepts);
+      int isTerminating = 1;
+
+      centerlines->GetPointCells(linepts[0], frontNeighbors);
+      frontGroupNeighbors->Reset();
+      for (int j=0; j<frontNeighbors->GetNumberOfIds(); j++)
+      {
+        frontGroupNeighbors->InsertNextId(centerlines->GetCellData()->GetArray(
+          "GroupIds")->GetTuple1(frontNeighbors->GetId(j)));
+      }
+
+      centerlines->GetPointCells(linepts[nlinepts-1], backNeighbors);
+      backGroupNeighbors->Reset();
+      for (int j=0; j<backNeighbors->GetNumberOfIds(); j++)
+      {
+        backGroupNeighbors->InsertNextId(centerlines->GetCellData()->GetArray(
+          "GroupIds")->GetTuple1(backNeighbors->GetId(j)));
+      }
+
+      if (backNeighbors->GetNumberOfIds() != 1 && frontNeighbors->GetNumberOfIds() != 1)
+        isTerminating = 0;
 
       double whl_divs[4];
       for (int j=0; j<4; j++)
@@ -277,20 +320,11 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
       // Set up new structured grid for nurbs surface lofting
       int newDims[3];
       newDims[0] = whl_divs[3]; newDims[1] = 2*whl_divs[1] + 2*whl_divs[2] - 3; newDims[2] = 1;
-      //if (groupId == 3)
-      //{
-      //  continue;
-      //}
-      //else if (groupId == 2)
-      //{
-      //  newDims[0] = 4; newDims[1] = savePoints->GetNumberOfPoints(); newDims[2] = 1;
-      //}
       vtkNew(vtkStructuredGrid, inputGrid);
       vtkNew(vtkPoints, inputGridPoints);
       inputGridPoints->SetNumberOfPoints(newDims[0] * newDims[1]);
       inputGrid->SetPoints(inputGridPoints);
       inputGrid->SetDimensions(newDims);
-
 
       // Loop through length and get exterior
       int rowCount = 0;
@@ -320,13 +354,6 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
             newPos[0] = j; newPos[1] = rowCount++; newPos[2] = 0;
             ptId = vtkStructuredData::ComputePointId(newDims, newPos);
             inputGrid->GetPoints()->SetPoint(ptId, pt);
-            //if (groupId == 0)
-            //{
-            //  if (j == 0)
-            //  {
-            //    savePoints->InsertNextPoint(pt);
-            //  }
-            //}
           }
         }
         // Go along right edge
@@ -349,13 +376,6 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
             newPos[0] = j; newPos[1] = rowCount++; newPos[2] = 0;
             ptId = vtkStructuredData::ComputePointId(newDims, newPos);
             inputGrid->GetPoints()->SetPoint(ptId, pt);
-            //if (groupId == 0)
-            //{
-            //  if (j == 0)
-            //  {
-            //    savePoints->InsertNextPoint(pt);
-            //  }
-            //}
           }
         }
         // Go along top edge
@@ -378,13 +398,6 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
             newPos[0] = j; newPos[1] = rowCount++; newPos[2] = 0;
             ptId = vtkStructuredData::ComputePointId(newDims, newPos);
             inputGrid->GetPoints()->SetPoint(ptId, pt);
-            //if (groupId == 0)
-            //{
-            //  if (j == 0)
-            //  {
-            //    savePoints->InsertNextPoint(pt);
-            //  }
-            //}
           }
         }
 
@@ -408,32 +421,8 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
             newPos[0] = j; newPos[1] = rowCount++; newPos[2] = 0;
             ptId = vtkStructuredData::ComputePointId(newDims, newPos);
             inputGrid->GetPoints()->SetPoint(ptId, pt);
-            //if (groupId == 0)
-            //{
-            //  if (j == 0)
-            //  {
-            //    savePoints->InsertNextPoint(pt);
-            //  }
-            //}
           }
         }
-
-        //if (groupId == 2)
-        //{
-        //  for (int k=0; k<savePoints->GetNumberOfPoints(); k++)
-        //  {
-        //    savePoints->GetPoint(k, pt);
-
-        //    newPos[0] = j; newPos[1] = k; newPos[2] = 0;
-        //    ptId = vtkStructuredData::ComputePointId(newDims, newPos);
-
-        //    for (int l=0; l<3; l++)
-        //    {
-        //      pt[2] = pt[2] - j*10.0;
-        //    }
-        //    inputGrid->GetPoints()->SetPoint(ptId, pt);
-        //  }
-        //}
       }
 
       // Now loft each surface
@@ -535,42 +524,42 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
       double **Xarr = new double*[Xlen1];
       double **Yarr = new double*[Xlen1];
       double **Zarr = new double*[Xlen1];
-      for (int i=0; i<Xlen1; i++)
+      for (int j=0; j<Xlen1; j++)
       {
-        Xarr[i] = new double[Xlen2];
-        Yarr[i] = new double[Xlen2];
-        Zarr[i] = new double[Xlen2];
-        for (int j=0; j<Xlen2; j++)
+        Xarr[j] = new double[Xlen2];
+        Yarr[j] = new double[Xlen2];
+        Zarr[j] = new double[Xlen2];
+        for (int k=0; k<Xlen2; k++)
         {
           double pt[3];
           double w;
-          controlPointGrid->GetControlPoint(i, j, 0, pt, w);
-          Xarr[i][j] = pt[0];
-          Yarr[i][j] = pt[1];
-          Zarr[i][j] = pt[2];
+          controlPointGrid->GetControlPoint(j, k, 0, pt, w);
+          Xarr[j][k] = pt[0];
+          Yarr[j][k] = pt[1];
+          Zarr[j][k] = pt[2];
         }
       }
 
       // Get mult information as arrays
       int uKlen = USingleKnotArray->GetNumberOfTuples();
       double *uKarr = new double[uKlen];
-      for (int i=0; i<uKlen; i++)
-        uKarr[i] = USingleKnotArray->GetTuple1(i);
+      for (int j=0; j<uKlen; j++)
+        uKarr[j] = USingleKnotArray->GetTuple1(j);
 
       int vKlen = VSingleKnotArray->GetNumberOfTuples();
       double *vKarr = new double[vKlen];
-      for (int i=0; i<vKlen; i++)
-        vKarr[i] = VSingleKnotArray->GetTuple1(i);
+      for (int j=0; j<vKlen; j++)
+        vKarr[j] = VSingleKnotArray->GetTuple1(j);
 
       int uMlen = UMultArray->GetNumberOfTuples();
       double *uMarr = new double[uMlen];
-      for (int i=0; i<uMlen; i++)
-        uMarr[i] = UMultArray->GetTuple1(i);
+      for (int j=0; j<uMlen; j++)
+        uMarr[j] = UMultArray->GetTuple1(j);
 
       int vMlen = VMultArray->GetNumberOfTuples();
       double *vMarr = new double[vMlen];
-      for (int i=0; i<vMlen; i++)
-        vMarr[i] = VMultArray->GetTuple1(i);
+      for (int j=0; j<vMlen; j++)
+        vMarr[j] = VMultArray->GetTuple1(j);
 
       // Flipping order!
       cvOCCTSolidModel* surf=new cvOCCTSolidModel();
@@ -585,11 +574,11 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
         std::cerr << "poly manipulation error ";
           delete surf;
           //Clean up
-          for (int i=0;i<Xlen1;i++)
+          for (int j=0;j<Xlen1;j++)
           {
-            delete [] Xarr[i];
-            delete [] Yarr[i];
-            delete [] Zarr[i];
+            delete [] Xarr[j];
+            delete [] Yarr[j];
+            delete [] Zarr[j];
           }
           delete [] Xarr;
           delete [] Yarr;
@@ -602,11 +591,11 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
           return NULL;
       }
       //Clean up
-      for (int i=0;i<Xlen1;i++)
+      for (int j=0;j<Xlen1;j++)
       {
-        delete [] Xarr[i];
-        delete [] Yarr[i];
-        delete [] Zarr[i];
+        delete [] Xarr[j];
+        delete [] Yarr[j];
+        delete [] Zarr[j];
       }
       delete [] Xarr;
       delete [] Yarr;
@@ -627,9 +616,113 @@ int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenter
       //}
       ////delete surf
 
+
+      // Now we need to get the points to split at
+      for (int surfEnd = 0; surfEnd < 2; surfEnd++)
+      {
+        vtkNew(vtkPoints, cartesianPoints);
+        for (int j=0; j<groupRegions.size(); j++)
+        {
+          if (groupRegions[j].IndexCluster != groupId)
+          {
+            continue;
+          }
+
+          fprintf(stdout,"NUM CORNER POINTS: %d\n", groupRegions[j].CornerPoints.size());
+          int cornerPtId;
+          double criticalPt[3];
+          vtkNew(vtkIdList, pointGroupIds);
+          vtkNew(vtkIdList, intersectList);
+          for (int k=0; k<groupRegions[j].CornerPoints.size(); k++)
+          {
+            cornerPtId = groupRegions[j].CornerPoints[k];
+            geom->GetPoint(cornerPtId, criticalPt);
+
+            pointGroupIds->Reset();
+            vtkSVGeneralUtils::GetPointCellsValues(geom, "GroupIds", cornerPtId, pointGroupIds);
+
+            intersectList->Reset();
+            intersectList->DeepCopy(pointGroupIds);
+
+            if (surfEnd == 0)
+
+            {
+              intersectList->IntersectWith(frontGroupNeighbors);
+
+              if (frontGroupNeighbors->GetNumberOfIds() == intersectList->GetNumberOfIds() &&
+                  pointGroupIds->GetNumberOfIds() == intersectList->GetNumberOfIds())
+              {
+                cartesianPoints->InsertNextPoint(criticalPt);
+              }
+            }
+            else
+            {
+              intersectList->IntersectWith(backGroupNeighbors);
+              if (backGroupNeighbors->GetNumberOfIds() == intersectList->GetNumberOfIds() &&
+                  pointGroupIds->GetNumberOfIds() == intersectList->GetNumberOfIds())
+              {
+                cartesianPoints->InsertNextPoint(criticalPt);
+              }
+            }
+          }
+        }
+
+        int edgeNumber;
+        if (groupId == 0)
+        {
+          edgeNumber = surfEnd;
+        }
+        else
+        {
+          edgeNumber = (surfEnd+1)%2;
+        }
+
+        // Must split edges at common points so that we can actually merge shapes
+        fprintf(stdout,"SPLITTING NUM POINTS: %d\n", cartesianPoints->GetNumberOfPoints());
+        if (cartesianPoints->GetNumberOfPoints() >= 2 && cartesianPoints->GetNumberOfPoints() <= 6)
+        {
+          if (OCCTUtils_SplitEdgeOnShapeNearPoints(*(surf->geom_), edgeNumber, cartesianPoints) != SV_OK)
+          {
+            std::cerr << "Could not split edge on surface" << endl;
+            return NULL;
+          }
+        }
+      }
+
       loftedSurfs.push_back(surf);
       //loftedSurfs.push_back(surfCapped);
     }
+
+    //for (int i=0; i<numGroups; i++)
+    //{
+    //  int groupId = groupIds->GetId(i);
+
+    //  // Get centerline info
+    //  vtkIdType nlinepts, *linepts;
+    //  int centerlineId = centerlines->GetCellData()->GetArray("GroupIds")->LookupValue(groupId);
+    //  centerlines->GetCellPoints(centerlineId, nlinepts, linepts);
+    //  int isTerminating = 1;
+
+    //  centerlines->GetPointCells(linepts[0], frontNeighbors);
+    //  frontGroupNeighbors->Reset();
+    //  for (int j=0; j<frontNeighbors->GetNumberOfIds(); j++)
+    //  {
+    //    frontGroupNeighbors->InsertNextId(centerlines->GetCellData()->GetArray(
+    //      "GroupIds")->GetTuple1(frontNeighbors->GetId(j)));
+    //  }
+
+    //  centerlines->GetPointCells(linepts[nlinepts-1], backNeighbors);
+    //  backGroupNeighbors->Reset();
+    //  for (int j=0; j<backNeighbors->GetNumberOfIds(); j++)
+    //  {
+    //    backGroupNeighbors->InsertNextId(centerlines->GetCellData()->GetArray(
+    //      "GroupIds")->GetTuple1(backNeighbors->GetId(j)));
+    //  }
+
+    //  if (backNeighbors->GetNumberOfIds() != 1 && frontNeighbors->GetNumberOfIds() != 1)
+    //    isTerminating = 0;
+    //}
+
 
     //vtkNew(vtkSVParameterizeVolumeOnPolycube, volParameterizer);
     //volParameterizer->SetInputData(geom);
