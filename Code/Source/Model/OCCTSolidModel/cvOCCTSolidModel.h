@@ -188,6 +188,9 @@ public:
   int CreateBSplineSurface(double **CX,double **CY,double **CZ,
     int &len1,int &len2, double *uKnots,int &uKlen,double *vKnots,int &vKlen,
     double *uMults,int &uMlen,double *vMults,int &vMlen,int &p,int &q);
+  int CreateBSplineCap(double **CX,double **CY,double **CZ,
+    int &len1,int &len2, double *uKnots,int &uKlen,double *vKnots,int &vKlen,
+    double *uMults,int &uMlen,double *vMults,int &vMlen,int &p,int &q);
 
   int GetOnlyPD(vtkPolyData *pd,double &max_dist) const;
 

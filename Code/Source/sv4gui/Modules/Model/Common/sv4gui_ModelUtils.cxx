@@ -1490,45 +1490,45 @@ vtkPolyData* sv4guiModelUtils::RunDecomposition(sv4guiModelElement* modelElement
     return NULL;
   }
 
-  //// CREATE USING SEWING
-  //fprintf(stdout,"SEWING\n");
-  //cvOCCTSolidModel *sewSolid = new cvOCCTSolidModel();
-  ////double sewTol = 1.0;
+  // CREATE USING SEWING
+  fprintf(stdout,"SEWING\n");
+  cvOCCTSolidModel *sewSolid = new cvOCCTSolidModel();
+  double sewTol = 1.0;
   //double sewTol = 0.05;
-  //sewSolid->Sew(loftedSurfs, sewTol);
-  //fprintf(stdout,"SEWED\n");
+  sewSolid->Sew(loftedSurfs, sewTol);
+  fprintf(stdout,"SEWED\n");
 
-  fprintf(stdout,"COMPOUNDING\n");
-  cvOCCTSolidModel* sewSolid=loftedSurfs[0];
-  BRep_Builder compoundBuilder;
-  TopoDS_Compound Compound;
-  compoundBuilder.MakeCompound(Compound);
-  for (int surfer=0; surfer<loftedSurfs.size(); surfer++)
-  {
-    compoundBuilder.Add(Compound,*(loftedSurfs[surfer]->geom_));
-  }
-  *(sewSolid->geom_) = Compound;
-  fprintf(stdout,"COMPOUNDED\n");
-
-  OCCTUtils_AnalyzeShape(*(sewSolid->geom_));
-
-  //int numFilled=0;
-  //BRepBuilderAPI_Sewing capAttacher;
-  //TopoDS_Shape cappedShape;
-  //if (OCCTUtils_CapShapeToSolid(*(sewSolid->geom_),cappedShape,capAttacher,numFilled) != SV_OK)
+  //fprintf(stdout,"COMPOUNDING\n");
+  //cvOCCTSolidModel* sewSolid=loftedSurfs[0];
+  //BRep_Builder compoundBuilder;
+  //TopoDS_Compound Compound;
+  //compoundBuilder.MakeCompound(Compound);
+  //for (int surfer=0; surfer<loftedSurfs.size(); surfer++)
   //{
-  //  fprintf(stderr,"Error capping shape\n");
-  //  return SV_ERROR;
+  //  compoundBuilder.Add(Compound,*(loftedSurfs[surfer]->geom_));
   //}
-
-  //*(sewSolid->geom_) = cappedShape;
-  //fprintf(stdout,"NUM FILLED: %d\n", numFilled);
+  //*(sewSolid->geom_) = Compound;
+  //fprintf(stdout,"COMPOUNDED\n");
 
   //OCCTUtils_AnalyzeShape(*(sewSolid->geom_));
 
+  int numFilled=0;
+  BRepBuilderAPI_Sewing capAttacher;
+  TopoDS_Shape cappedShape;
+  if (OCCTUtils_CapShapeToSolid(*(sewSolid->geom_),cappedShape,capAttacher,numFilled) != SV_OK)
+  {
+    fprintf(stderr,"Error capping shape\n");
+    return SV_ERROR;
+  }
+
+  *(sewSolid->geom_) = cappedShape;
+  fprintf(stdout,"NUM FILLED: %d\n", numFilled);
+
+  OCCTUtils_AnalyzeShape(*(sewSolid->geom_));
+
   fprintf(stdout,"GET VTK REP\n");
   //cvPolyData *wholePd = sewSolid->GetPolyData(0, 20.0);
-  cvPolyData *wholePd = sewSolid->GetPolyData(1, 5.0);
+  cvPolyData *wholePd = sewSolid->GetPolyData(1, 1.0);
 
   return wholePd->GetVtkPolyData();
 

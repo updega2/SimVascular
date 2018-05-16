@@ -74,6 +74,11 @@ public:
   //@}
 
   //@{
+  /// \brief Get/Set temporary
+  vtkGetObjectMacro(NURBSSurfaceRepresentationPd,vtkPolyData);
+  //@}
+
+  //@{
   /// \brief Get/Set macro for surface polycube
   vtkSetObjectMacro(PolycubeUg,vtkUnstructuredGrid);
   vtkGetObjectMacro(PolycubeUg,vtkUnstructuredGrid);
@@ -100,6 +105,12 @@ public:
   vtkGetStringMacro(GridIdsArrayName);
   //@}
 
+  //@{
+  /// \brief Get/Set the radius information
+  vtkSetMacro(EnforcePolycubeConnectivity, int);
+  vtkGetMacro(EnforcePolycubeConnectivity, int);
+  vtkBooleanMacro(EnforcePolycubeConnectivity, int);
+  //@}
 
 protected:
   vtkSVParameterizeSurfaceOnPolycube();
@@ -133,15 +144,20 @@ protected:
   vtkPolyData *PolycubePd;
   vtkPolyData *SurfaceOnPolycubePd;
   vtkPolyData *PolycubeOnSurfacePd;
+  vtkPolyData *NURBSSurfaceRepresentationPd;
 
   vtkUnstructuredGrid *PolycubeUg;
 
   int PrepFilter(); // Prep work.
   int RunFilter(); // Run filter operations.
 
+  int FormNURBSSurface();
+
   char *GroupIdsArrayName;
   char *PatchIdsArrayName;
   char *GridIdsArrayName;
+
+  int EnforcePolycubeConnectivity;
 
 private:
   vtkSVParameterizeSurfaceOnPolycube(const vtkSVParameterizeSurfaceOnPolycube&);  // Not implemented.

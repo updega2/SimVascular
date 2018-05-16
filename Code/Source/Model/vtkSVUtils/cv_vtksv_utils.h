@@ -50,8 +50,14 @@
 #include "cvPolyData.h"
 #include "cvOCCTSolidModel.h"
 #include "vtkUnstructuredGrid.h"
+
+#include "vtkSVNURBSSurface.h"
+
 #include "svVTKSVUtilsExports.h" // For exports
 
 SV_EXPORT_VTKSV_UTILS int VTKSVUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenterlines, cvPolyData **decomposedPolyData, std::vector<cvOCCTSolidModel*> &loftedSurfs);
+
+SV_EXPORT_VTKSV_UTILS int VTKSVUtils_NURBSSurfaceToOCCTBSpline(vtkSVNURBSSurface *NURBSSurface,
+                                         cvOCCTSolidModel *solidModel);
 
 #endif //__CV_VTKSV_UTILS_H

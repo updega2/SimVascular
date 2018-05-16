@@ -114,12 +114,6 @@ SV_EXPORT_OPENCASCADE int OCCTUtils_ShapeFromBSplineSurface(const Handle(Geom_BS
     		TopoDS_Shape &shape,
 		const TopoDS_Wire &first_wire, const TopoDS_Wire &last_wire);
 
-SV_EXPORT_OPENCASCADE int OCCTUtils_ShapeFromBSplineSurfaceWithEdges(const Handle(Geom_BSplineSurface) surface,
-    		TopoDS_Shape &shape, std::vector<TopoDS_Edge> edges);
-
-SV_EXPORT_OPENCASCADE int OCCTUtils_ShapeFromBSplineSurfaceWithSplitEdges(const Handle(Geom_BSplineSurface) surface,
-    		TopoDS_Shape &shape, std::vector<TopoDS_Edge> edges);
-
 SV_EXPORT_OPENCASCADE int OCCTUtils_CapShapeToSolid(TopoDS_Shape &shape,TopoDS_Shape &geom,
     		BRepBuilderAPI_Sewing &attacher,int &numFilled);
 

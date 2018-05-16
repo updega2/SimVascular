@@ -49,6 +49,7 @@
 #include "vtkDataSetSurfaceFilter.h"
 #include "vtkQuadricDecimation.h"
 #include "vtkMath.h"
+#include "vtkXMLPolyDataWriter.h"
 #include "cv_get_tcl_interp_init.h"
 #include "cv_polydatasolid_utils.h"
 #include "cv_occtsolid_utils.h"
@@ -87,6 +88,7 @@
 #include "BRepOffsetAPI_MakePipe.hxx"
 #include "BRepOffsetAPI_ThruSections.hxx"
 #include "BRepLib_MakePolygon.hxx"
+#include "BRepLib_FuseEdges.hxx"
 #include "BRepAlgoAPI_Fuse.hxx"
 #include "BRepAlgoAPI_Common.hxx"
 #include "BRepAlgoAPI_Cut.hxx"
@@ -1655,6 +1657,19 @@ int cvOCCTSolidModel::CreateBSplineSurface(double **CX,double **CY,double **CZ,
         	  Standard_False,Standard_False);
   TopoDS_Compound freeWires = findFree.GetClosedWires();
   TopExp_Explorer NewEdgeExp;
+
+  NewEdgeExp.Init(freeWires,TopAbs_EDGE);
+  int numWires = 0;
+  for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
+  {
+    numWires++;
+  }
+  if (numWires != 2)
+  {
+    std::cerr << "Incorrect number of open edges on surface" << endl;
+    return SV_ERROR;
+  }
+
   NewEdgeExp.Init(freeWires,TopAbs_EDGE);
   for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
   {
@@ -1687,6 +1702,183 @@ int cvOCCTSolidModel::CreateBSplineSurface(double **CX,double **CY,double **CZ,
 
   return SV_OK;
 }
+
+// -------------------
+// CreateBSplineCap
+// -------------------
+int cvOCCTSolidModel::CreateBSplineCap(double **CX,double **CY,double **CZ,
+    int &len1,int &len2,double *uKnots,int &uKlen,double *vKnots,int &vKlen,
+    double *uMults,int &uMlen,double *vMults,int &vMlen,int &p,int &q)
+{
+  //Create a BSpline surface from the input control points,knots, and mults
+
+  TColgp_Array2OfPnt cPoints(1,len2,1,len1);
+  for (int i=0;i<len1;i++)
+  {
+    for (int j=0;j<len2;j++)
+    {
+      gp_Pnt newPnt(CX[i][j],CY[i][j],CZ[i][j]);
+      cPoints.SetValue(j+1,i+1,newPnt);
+    }
+  }
+
+  //Knot spans
+  TColStd_Array1OfReal uKCol(1,uKlen);
+  for (int i=0;i<uKlen;i++)
+    uKCol.SetValue(i+1, uKnots[i]);
+  TColStd_Array1OfReal vKCol(1,vKlen);
+  for (int i=0;i<vKlen;i++)
+    vKCol.SetValue(i+1, vKnots[i]);
+
+  //Mult spans
+  TColStd_Array1OfInteger uMCol(1,uMlen);
+  for (int i=0;i<uMlen;i++)
+    uMCol.SetValue(i+1,(int) uMults[i]);
+  TColStd_Array1OfInteger vMCol(1,vMlen);
+  for (int i=0;i<vMlen;i++)
+    vMCol.SetValue(i+1,(int) vMults[i]);
+
+  Standard_Real tol = 1.e-6;
+  Handle(Geom_BSplineSurface) surface;
+  Handle(Geom_Surface) aSurf;
+  try {
+    Standard_Boolean uPer=Standard_False,vPer=Standard_False;
+    surface = new Geom_BSplineSurface(cPoints,uKCol,vKCol,uMCol,vMCol,p,q,uPer,vPer);
+    //surface->SetUPeriodic();
+    aSurf = surface;
+    fprintf(stdout,"-----------------BSPLINE PARAMETERS----------------------\n");
+    fprintf(stdout,"U Degree:             %d\n",surface->UDegree());
+    fprintf(stdout,"Is U Closed?:         %d\n",surface->IsUClosed());
+    fprintf(stdout,"Is U Periodic?:       %d\n",surface->IsUPeriodic());
+    fprintf(stdout,"Is U Rational?:       %d\n",surface->IsURational());
+    fprintf(stdout,"Nb U Poles:           %d\n",surface->NbUPoles());
+    fprintf(stdout,"Nb U Knots:           %d\n",surface->NbUKnots());
+    fprintf(stdout,"First U Knot Index:   %d\n",surface->FirstUKnotIndex());
+    fprintf(stdout,"Last U Knot Index:    %d\n",surface->LastUKnotIndex());
+    fprintf(stdout,"_________________________________________________________\n");
+    fprintf(stdout,"V Degree:             %d\n",surface->VDegree());
+    fprintf(stdout,"Is V Closed?:         %d\n",surface->IsVClosed());
+    fprintf(stdout,"Is V Periodic?:       %d\n",surface->IsVPeriodic());
+    fprintf(stdout,"Is U Rational?:       %d\n",surface->IsVRational());
+    fprintf(stdout,"Nb V Poles:           %d\n",surface->NbVPoles());
+    fprintf(stdout,"Nb V Knots:           %d\n",surface->NbVKnots());
+    fprintf(stdout,"First V Knot Index:   %d\n",surface->FirstVKnotIndex());
+    fprintf(stdout,"Last V Knot Index:    %d\n",surface->LastVKnotIndex());
+    fprintf(stdout,"_________________________________________________________\n");
+  }
+  catch (Standard_ConstructionError)
+  {
+    fprintf(stderr,"Construction Error\n");
+    return SV_ERROR;
+  }
+
+  BRepBuilderAPI_MakeShell shellBuilder(aSurf);
+  this->NewShape();
+  *geom_ = shellBuilder.Shape();
+
+  //Attacher!
+  BRepBuilderAPI_MakeWire wireMaker;
+  TopoDS_Wire wire;
+  Standard_Real sewtoler =  1.e-6;
+  Standard_Real closetoler =  1.e-2;
+  ShapeFix_FreeBounds findFree(*geom_,sewtoler,closetoler,
+        	  Standard_False,Standard_False);
+  TopoDS_Compound freeWires = findFree.GetClosedWires();
+  TopExp_Explorer NewEdgeExp;
+  NewEdgeExp.Init(freeWires,TopAbs_EDGE);
+  int numEdges = 0;
+  for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
+  {
+    TopoDS_Edge thisEdge = TopoDS::Edge(NewEdgeExp.Current());
+
+    wireMaker.Add(thisEdge);
+
+    numEdges++;
+  }
+
+  wireMaker.Build();
+
+  TopoDS_Wire outsideWire = wireMaker.Wire();
+
+  BRepLib_FuseEdges fuser(outsideWire);
+  fuser.Perform();
+
+  TopoDS_Shape fusedEdge = fuser.Shape();
+
+  //TopoDS_Face face;
+  //TopoDS_Shell shell;
+  //BRep_Builder builder;
+
+  //builder.MakeShell(shell);
+
+  //// make the face
+  //builder.MakeFace(face, aSurf, Precision::Confusion());
+
+  //builder.Add(face, fusedWire);
+  //builder.Add(shell, face);
+
+  //fprintf(stdout,"AQUIL\n");
+  //*geom_ = shell;
+  ////*geom_ = OCCTUtils_MakeShell(shell);
+  //fprintf(stdout,"AQUIR\n");
+
+  //NewEdgeExp.Init(*geom_,TopAbs_EDGE);
+  //numEdges = 0;
+  //for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
+  //{
+  //  numEdges++;
+  //}
+  //fprintf(stdout,"NUM EDGES: %d\n", numEdges);
+
+  int degOfCap=2;
+  int numPointsOnCurve = 20;
+  BRepFill_Filling filler(degOfCap,numPointsOnCurve);
+
+  NewEdgeExp.Init(fusedEdge,TopAbs_EDGE);
+  numEdges = 0;
+  for (int i=0;NewEdgeExp.More();NewEdgeExp.Next(),i++)
+  {
+    TopoDS_Edge thisEdge = TopoDS::Edge(NewEdgeExp.Current());
+    filler.Add(thisEdge,GeomAbs_C0,Standard_True);
+    numEdges++;
+  }
+  fprintf(stdout,"HOW MANY EDGES; %d\n", numEdges);
+
+  try {
+    filler.Build();
+  }
+  catch (Standard_Failure)
+  {
+    fprintf(stderr,"Failure when filling holes\n");
+    return SV_ERROR;
+  }
+
+  fprintf(stdout,"AQUIS\n");
+  *geom_ = filler.Face();
+  fprintf(stdout,"AQUIZ\n");
+
+  //Standard_Real pres3d = 1.0e-6;
+  //if (OCCTUtils_ShapeFromBSplineSurface(surface,*geom_,wires[0],wires[1]) != SV_OK)
+  //{
+  //  fprintf(stderr,"Error in conversion from bspline surface to shape\n");
+  //  return SV_ERROR;
+  //}
+  ////TopoDS_Face firstFace,lastFace;
+  ////*geom_ = OCCTUtils_MakeSolid(shellBuilder.Shell(),wires[0],wires[1],firstFace,lastFace,pres3d);
+
+  this->AddShape();
+
+  //Name faces
+  TopExp_Explorer anExp(*geom_,TopAbs_FACE);
+  for (int i=0;anExp.More();anExp.Next(),i++)
+  {
+    TopoDS_Face tmpFace = TopoDS::Face(anExp.Current());
+    OCCTUtils_SetFaceAttribute(tmpFace,shapetool_,*shapelabel_,"gdscName","cap");
+  }
+
+  return SV_OK;
+}
+
 
 // ---------------
 // GetOnlyPD

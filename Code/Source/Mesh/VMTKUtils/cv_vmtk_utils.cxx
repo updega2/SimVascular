@@ -391,7 +391,6 @@ int VMTKUtils_DecomposePolyData( cvPolyData *polydata, cvPolyData *mergedCenterl
     decomposer->SetRadiusMergeRatio(0.1);
     decomposer->SetUseAbsoluteMergeDistance(0);
     decomposer->SetMergeDistance(0.1);
-    decomposer->SetEnforceBoundaryDirections(1);
     decomposer->SetUseVmtkClipping(0);
     decomposer->SetUseRadiusInformation(1);
     decomposer->SetIsVasculature(1);
