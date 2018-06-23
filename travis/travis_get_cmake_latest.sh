@@ -47,14 +47,12 @@ if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   sudo rm /usr/local/bin/cmake
   sudo rm /usr/local/bin/cpack
   sudo rm /usr/local/bin/ctest
-  ls
-  pwd
+  sudo cp cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/ccmake /usr/local/bin/ccmake
+  sudo cp cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/cmake /usr/local/bin/cmake
+  sudo cp cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/cpack /usr/local/bin/cpack
+  sudo cp cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/ctest /usr/local/bin/ctest
   ls cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/c*
   ls /usr/local/bin/c*
-  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/ccmake /usr/local/bin/ccmake
-  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/cmake /usr/local/bin/cmake
-  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/cpack /usr/local/bin/cpack
-  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/ctest /usr/local/bin/ctest
 fi
 
 #compilers
