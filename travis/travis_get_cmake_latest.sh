@@ -42,7 +42,12 @@ if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
 fi
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   wget http://simvascular.stanford.edu/downloads/public/open_source/mac_osx/cmake/cmake-3.10.3-Darwin-x86_64.tar.gz
-  # need to install here!
+  tar -xzvf cmake-3.10.3-Darwin-x86_64.tar.gz
+  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/ccmake     /usr/local/bin/ccmake
+  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/cmake      /usr/local/bin/cmake
+  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/ccmake-gui /usr/local/bin/ccmake-gui
+  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/cpack      /usr/local/bin/cpack
+  sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/ctest      /usr/local/bin/ctest
 fi
 
 #compilers
