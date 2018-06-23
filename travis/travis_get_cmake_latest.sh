@@ -47,6 +47,8 @@ if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   sudo rm /usr/local/bin/cmake
   sudo rm /usr/local/bin/cpack
   sudo rm /usr/local/bin/ctest
+  ls
+  pwd
   sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/ccmake /usr/local/bin/ccmake
   sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/cmake /usr/local/bin/cmake
   sudo ln -s cmake-3.10.3-Darwin-x86_64/CMake.app/Contents/bin/cpack /usr/local/bin/cpack
