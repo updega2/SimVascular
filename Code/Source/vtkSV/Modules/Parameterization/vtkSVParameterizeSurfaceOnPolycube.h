@@ -1,4 +1,3 @@
-
 /*=========================================================================
  *
  * Copyright (c) 2014-2015 The Regents of the University of California.
@@ -139,6 +138,11 @@ protected:
                            std::vector<int> &ptMap,
                            std::vector<std::vector<int> > &invPtMap);
   int RemoveInteriorCells(vtkPolyData *quadMesh);
+
+  int SetControlMeshBoundaries(vtkPolyData *mappedSurface,
+                               vtkPolyData *cleanSurface,
+                               const std::vector<int> ptMap,
+                               const std::vector<std::vector<int> > invPtMap);
 
   vtkPolyData *WorkPd;
   vtkPolyData *PolycubePd;

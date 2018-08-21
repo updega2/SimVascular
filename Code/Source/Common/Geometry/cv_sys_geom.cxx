@@ -1866,7 +1866,7 @@ cvPolyData *sys_geom_Align( cvPolyData *ref, cvPolyData *src )
       posId = i;
     } else {
       if ( currScore > maxScore ) {
-	posId = i;
+        posId = i;
       }
       maxScore = maximum( maxScore, currScore );
     }

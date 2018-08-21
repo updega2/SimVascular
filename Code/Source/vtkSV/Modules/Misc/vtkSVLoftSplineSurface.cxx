@@ -528,15 +528,15 @@ int vtkSVLoftSplineSurface::LoftSolid(vtkPolyData *inputs[], int numInputs,
       vconnA->InsertNextId(j + offset);
       if (j == (numCurvePts - 1))
       {
-	vconnA->InsertNextId(0 + offset);
-	vconnA->InsertNextId(numCurvePts + offset);
-	vconnB->InsertNextId(numCurvePts + offset);
+        vconnA->InsertNextId(0 + offset);
+        vconnA->InsertNextId(numCurvePts + offset);
+        vconnB->InsertNextId(numCurvePts + offset);
       }
       else
       {
-	vconnA->InsertNextId(j + 1 + offset);
-	vconnA->InsertNextId(numCurvePts + j + 1 + offset);
-	vconnB->InsertNextId(numCurvePts + j + 1 + offset);
+        vconnA->InsertNextId(j + 1 + offset);
+        vconnA->InsertNextId(numCurvePts + j + 1 + offset);
+        vconnB->InsertNextId(numCurvePts + j + 1 + offset);
       }
       vconnB->InsertNextId(numCurvePts + j + offset);
       vconnB->InsertNextId(j + offset);

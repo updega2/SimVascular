@@ -44,6 +44,7 @@
 #include "vtkIntArray.h"
 #include "vtkLine.h"
 #include "vtkLinearSubdivisionFilter.h"
+#include "vtkLoopSubdivisionFilter.h"
 #include "vtkMath.h"
 #include "vtkObjectFactory.h"
 #include "vtkPointData.h"
@@ -533,49 +534,60 @@ int vtkSVParameterizeSurfaceOnPolycube::RunFilter()
   this->InterpolateMapOntoTarget(cleanSurface, this->WorkPd, this->SurfaceOnPolycubePd, cleanPolycubeOnSurfacePd, this->GroupIdsArrayName);
   cleanPolycubeOnSurfacePd->BuildLinks();
 
-  // Since we have the mapping, now we can do some smoothing if we want
-  // Set which points to smooth
-  vtkNew(vtkIntArray, smoothPointArray);
-  smoothPointArray->SetNumberOfTuples(cleanPolycubeOnSurfacePd->GetNumberOfPoints());
-  smoothPointArray->FillComponent(0, 1);
-  smoothPointArray->SetName("SmoothPoints");
+  // Now fix to make sure fits constraints for control mesh
+  this->SetControlMeshBoundaries(this->PolycubeOnSurfacePd, cleanPolycubeOnSurfacePd, surfacePtMap, invSurfacePtMap);
 
-  vtkNew(vtkIdList, patchValues);
-  for (int i=0; i<cleanPolycubeOnSurfacePd->GetNumberOfPoints(); i++)
-  {
-    patchValues->Reset();
-    vtkSVGeneralUtils::GetPointCellsValues(cleanPolycubeOnSurfacePd, this->PatchIdsArrayName, i, patchValues);
+  //// Since we have the mapping, now we can do some smoothing if we want
+  //// Set which points to smooth
+  //vtkNew(vtkIntArray, smoothPointArray);
+  //smoothPointArray->SetNumberOfTuples(cleanPolycubeOnSurfacePd->GetNumberOfPoints());
+  //smoothPointArray->FillComponent(0, 1);
+  //smoothPointArray->SetName("SmoothPoints");
 
-    for (int j=0; j<patchValues->GetNumberOfIds(); j++)
-    {
-      patchValues->SetId(j, patchValues->GetId(j)%6);
-    }
+  //vtkNew(vtkIdList, patchValues);
+  //for (int i=0; i<cleanPolycubeOnSurfacePd->GetNumberOfPoints(); i++)
+  //{
+  //  patchValues->Reset();
+  //  vtkSVGeneralUtils::GetPointCellsValues(cleanPolycubeOnSurfacePd, this->PatchIdsArrayName, i, patchValues);
 
-    if (patchValues->IsId(4) != -1 || patchValues->IsId(5) != -1)
-    {
-      smoothPointArray->SetTuple1(i, 0);
-    }
-  }
-  cleanPolycubeOnSurfacePd->GetPointData()->AddArray(smoothPointArray);
+  //  for (int j=0; j<patchValues->GetNumberOfIds(); j++)
+  //  {
+  //    patchValues->SetId(j, patchValues->GetId(j)%6);
+  //  }
 
-  vtkNew(vtkSVUpdeSmoothing, paramSmoother);
-  paramSmoother->SetInputData(cleanPolycubeOnSurfacePd);
-  paramSmoother->SetSmoothPointArrayName("SmoothPoints");
-  paramSmoother->SetNumberOfInnerSmoothOperations(200);
-  paramSmoother->Update();
+  //  if (patchValues->IsId(4) != -1 || patchValues->IsId(5) != -1)
+  //  {
+  //    smoothPointArray->SetTuple1(i, 0);
+  //  }
+  //}
+  //cleanPolycubeOnSurfacePd->GetPointData()->AddArray(smoothPointArray);
 
-  cleanPolycubeOnSurfacePd->DeepCopy(paramSmoother->GetOutput());
+  //vtkNew(vtkLoopSubdivisionFilter, subdivider);
+  //subdivider->SetInputData(this->WorkPd);
+  //subdivider->SetNumberOfSubdivisions(3);
+  //subdivider->Update();
 
-  double pt[3];
-  for (int i=0; i<cleanPolycubeOnSurfacePd->GetNumberOfPoints(); i++)
-  {
-    cleanPolycubeOnSurfacePd->GetPoint(i, pt);
-    for (int j=0; j<invSurfacePtMap[i].size(); j++)
-    {
-      this->PolycubeOnSurfacePd->GetPoints()->SetPoint(invSurfacePtMap[i][j], pt);
-    }
-  }
-  vtkSVIOUtils::WriteVTPFile("/Users/adamupdegrove/Desktop/tmp/DOUBLECHECK.vtp", cleanPolycubeOnSurfacePd);
+  //vtkSVIOUtils::WriteVTPFile("/Users/adamupdegrove/Desktop/tmp/DOUBLECHECK_BEFORE.vtp", cleanPolycubeOnSurfacePd);
+  //vtkNew(vtkSVUpdeSmoothing, paramSmoother);
+  //paramSmoother->SetInputData(cleanPolycubeOnSurfacePd);
+  //paramSmoother->SetSmoothPointArrayName("SmoothPoints");
+  //paramSmoother->SetNumberOfOuterSmoothOperations(5);
+  //paramSmoother->SetNumberOfInnerSmoothOperations(200);
+  //paramSmoother->SetSourcePd(subdivider->GetOutput()); // Constrain to original surface
+  //paramSmoother->Update();
+
+  //cleanPolycubeOnSurfacePd->DeepCopy(paramSmoother->GetOutput());
+
+  //double pt[3];
+  //for (int i=0; i<cleanPolycubeOnSurfacePd->GetNumberOfPoints(); i++)
+  //{
+  //  cleanPolycubeOnSurfacePd->GetPoint(i, pt);
+  //  for (int j=0; j<invSurfacePtMap[i].size(); j++)
+  //  {
+  //    this->PolycubeOnSurfacePd->GetPoints()->SetPoint(invSurfacePtMap[i][j], pt);
+  //  }
+  //}
+  //vtkSVIOUtils::WriteVTPFile("/Users/adamupdegrove/Desktop/tmp/DOUBLECHECK.vtp", cleanPolycubeOnSurfacePd);
 
   //// This is to be moved to a separate filter
   //if (this->FormNURBSSurface() != SV_OK)
@@ -1240,6 +1252,240 @@ int vtkSVParameterizeSurfaceOnPolycube::FormNURBSSurface()
 
   std::string fn = "/Users/adamupdegrove/Desktop/tmp/LOFTAPPENDEROUT.vtp";
   vtkSVIOUtils::WriteVTPFile(fn, loftAppender->GetOutput());
+
+  return SV_OK;
+}
+
+// ----------------------
+// SetControlMeshBoundaries
+// ----------------------
+int vtkSVParameterizeSurfaceOnPolycube::SetControlMeshBoundaries(vtkPolyData *mappedSurface,
+                                                                 vtkPolyData *cleanSurface,
+                                                                 const std::vector<int> ptMap,
+                                                                 const std::vector<std::vector<int> > invPtMap)
+{
+  int numPoints = mappedSurface->GetNumberOfPoints();
+
+  vtkNew(vtkIntArray, isBoundaryPoint);
+  isBoundaryPoint->SetNumberOfTuples(numPoints);
+  isBoundaryPoint->FillComponent(0, -1);
+  isBoundaryPoint->SetName("IsBoundaryPoint");
+
+  std::vector<std::vector<int> > boundaryGroupMatchings;
+  std::vector<std::vector<int> > groupSets;
+  std::vector<int> pointGroupIds(numPoints, -1);
+  for (int i=0; i<invPtMap.size(); i++)
+  {
+    if (invPtMap[i].size() > 1)
+    {
+      for (int j=0; j<invPtMap[i].size(); j++)
+        isBoundaryPoint->SetTuple1(invPtMap[i][j], 1);
+    }
+
+    std::vector<int> groupIds;
+    for (int j=0; j<invPtMap[i].size(); j++)
+    {
+
+      vtkNew(vtkIdList, pointCellIds);
+      mappedSurface->GetPointCells(invPtMap[i][j], pointCellIds);
+
+      if (pointCellIds->GetNumberOfIds() > 0)
+      {
+        int cellId = pointCellIds->GetId(0);
+        int groupId = mappedSurface->GetCellData()->GetArray("GroupIds")->GetTuple1(cellId);
+        groupIds.push_back(groupId);
+        pointGroupIds[invPtMap[i][j]] = groupId;
+      }
+      else
+      {
+        vtkErrorMacro("All of these boundary points should be attached to at least one cell");
+        return SV_ERROR;
+      }
+    }
+
+    std::sort(groupIds.begin(), groupIds.end());
+    groupSets.push_back(groupIds);
+
+    int addBoundary = 1;
+    for (int k=0; k<boundaryGroupMatchings.size(); k++)
+    {
+      if (boundaryGroupMatchings[k] == groupIds)
+        addBoundary = 0;
+    }
+
+    if (addBoundary)
+      boundaryGroupMatchings.push_back(groupIds);
+  }
+
+  //std::vector<std::vector<int> > pointsInMatching;
+  //std::vector<std::vector<int> > cleanPointsInMatching;
+  //for (int i=0; i<boundaryGroupMatchings.size(); i++)
+  //{
+  //  std::vector<int> pointIds;
+  //  std::vector<int> cleanPointIds;
+  //  if (boundaryGroupMatchings[i].size() > 1)
+  //  {
+  //    for (int j=0; j<invPtMap.size(); j++)
+  //    {
+  //      if (invPtMap[j].size() > 1)
+  //      {
+  //        if (groupSets[j] == boundaryGroupMatchings[i])
+  //        {
+  //          for (int k=0; k<invPtMap[j].size(); k++)
+  //          {
+  //            pointIds.push_back(invPtMap[j][k]);
+  //          }
+  //          cleanPointIds.push_back(j);
+  //        }
+  //      }
+  //    }
+  //  }
+  //  pointsInMatching.push_back(pointIds);
+  //  cleanPointsInMatching.push_back(cleanPointIds);
+  //}
+
+  //std::vector<std::vector<int> > ptEdgeNeighbors;
+  //this->GetPointConnectivity(cleanSurface, ptEdgeNeighbors);
+
+  //for (int i=0; i<boundaryGroupMatchings.size(); i++)
+  //{
+  //  int numGroups = boundaryGroupMatchings[i].size();
+  //  if (numGroups == 3)
+  //  {
+  //    std::vector<int> outsideIndices;
+  //    for (int j=0; j<cleanPointsInMatching[i].size(); j++)
+  //    {
+  //      int cleanPointId = cleanPointsInMatching[i][j];
+  //      int isInterior = cleanSurface->GetPointData()->GetArray("IsInteriorPoint")->GetTuple1(cleanPointId);
+  //      if (!isInterior)
+  //        outsideIndices.push_back(j);
+  //    }
+  //    if (outsideIndices.size() != 2)
+  //    {
+  //      vtkDebugMacro("There should be two points along interior boundary ridge, but there are " << outsideIndices.size());
+  //      return SV_ERROR;
+  //    }
+
+  //    int linePtId0 = cleanPointsInMatching[i][outsideIndices[0]];
+  //    int linePtId1 = cleanPointsInMatching[i][outsideIndices[1]];
+  //    double pt0[3], pt1[3];
+  //    cleanSurface->GetPoint(linePtId0, pt0);
+  //    cleanSurface->GetPoint(linePtId1, pt1);
+
+  //    for (int j=0; j<cleanPointsInMatching[i].size(); j++)
+  //    {
+  //      if (j != outsideIndices[0] && j != outsideIndices[1])
+  //      {
+  //        double currPt[3];
+  //        int cleanPointId = cleanPointsInMatching[i][j];
+  //        cleanSurface->GetPoint(cleanPointId, currPt);
+
+  //        double t;
+  //        double closestPt[3];
+  //        double dist = vtkLine::DistanceToLine(currPt, pt0, pt1, t, closestPt);
+
+  //        cleanSurface->GetPoints()->SetPoint(cleanPointId, closestPt);
+  //        for (int k=0; k<invPtMap[cleanPointId].size(); k++)
+  //        {
+  //          int pointId = invPtMap[cleanPointId][k];
+  //          mappedSurface->GetPoints()->SetPoint(pointId, closestPt);
+  //        }
+  //      }
+  //    }
+
+  //    // Now set the plane points mister son guy
+  //    double ridgeVec[3];
+  //    vtkMath::Subtract(pt1, pt0, ridgeVec);
+  //    vtkMath::Normalize(ridgeVec);
+
+  //    for (int j=0; j<numGroups; j++)
+  //    {
+  //      std::vector<int> twoGroups(2);
+  //      twoGroups[0] = boundaryGroupMatchings[i][j];
+  //      twoGroups[1] = boundaryGroupMatchings[i][(j+1)%numGroups];
+  //      std::sort(twoGroups.begin(), twoGroups.end());
+
+  //      // Loop through again and find just these beeznees
+  //      double avgPlaneNormal[3];
+  //      avgPlaneNormal[0] = 0.0;
+  //      avgPlaneNormal[1] = 0.0;
+  //      avgPlaneNormal[2] = 0.0;
+  //      int numPtsInPlane = 0;
+  //      for (int k=0; k<boundaryGroupMatchings.size(); k++)
+  //      {
+  //        if (boundaryGroupMatchings[k] == twoGroups)
+  //        {
+  //          for (int l=0; l<cleanPointsInMatching[k].size(); l++)
+  //          {
+  //            double currPt[3];
+  //            int cleanPointId = cleanPointsInMatching[k][l];
+  //            cleanSurface->GetPoint(cleanPointId, currPt);
+
+  //            double t;
+  //            double closestPt[3];
+  //            double dist = vtkLine::DistanceToLine(currPt, pt0, pt1, t, closestPt);
+
+  //            double vec[3];
+  //            vtkMath::Subtract(currPt, closestPt, vec);
+  //            vtkMath::Normalize(vec);
+
+  //            double planeNormal[3];
+  //            vtkMath::Cross(ridgeVec, vec, planeNormal);
+  //            vtkMath::Normalize(planeNormal);
+
+  //            for (int m=0; m<3; m++)
+  //              avgPlaneNormal[m] += planeNormal[m];
+  //            numPtsInPlane++;
+  //          }
+  //        }
+  //      }
+  //      for (int k=0; k<3; k++)
+  //        avgPlaneNormal[k] = avgPlaneNormal[k]/numPtsInPlane;
+
+  //      for (int k=0; k<boundaryGroupMatchings.size(); k++)
+  //      {
+  //        if (boundaryGroupMatchings[k] == twoGroups)
+  //        {
+  //          for (int l=0; l<cleanPointsInMatching[k].size(); l++)
+  //          {
+  //            int cleanPointId = cleanPointsInMatching[k][l];
+
+  //            std::vector<int> neighborIds;
+  //            for (int m=0; m<ptEdgeNeighbors[cleanPointId].size(); m++)
+  //            {
+  //              int neighborPointId = ptEdgeNeighbors[cleanPointId][m];
+  //              if (isBoundaryPoint->GetValue(neighborPointId) == -1)
+  //                neighborIds.push_back(neighborPointId);
+  //            }
+
+  //            if (neighborIds.size() != 2)
+  //            {
+  //              vtkErrorMacro("Should be two neighbors to this interace point, but there is " << neighborIds.size());
+  //              return SV_ERROR;
+  //            }
+
+  //            double neighborPt0[3], neighborPt1[3];
+  //            cleanSurface->GetPoint(neighborIds[0], neighborPt0);
+  //            cleanSurface->GetPoint(neighborIds[1], neighborPt1);
+
+  //            double planeT;
+  //            double planeClosestPt[3];
+  //            vtkPlane::IntersectWithLine(neighborPt0, neighborPt1, avgPlaneNormal, pt0, planeT, planeClosestPt);
+
+  //            cleanSurface->GetPoints()->SetPoint(cleanPointId, planeClosestPt);
+  //            for (int k=0; k<invPtMap[cleanPointId].size(); k++)
+  //            {
+  //              int pointId = invPtMap[cleanPointId][k];
+  //              mappedSurface->GetPoints()->SetPoint(pointId, planeClosestPt);
+  //            }
+  //          }
+  //        }
+  //      }
+  //    }
+  //  }
+  //}
+
+  mappedSurface->GetPointData()->AddArray(isBoundaryPoint);
 
   return SV_OK;
 }
